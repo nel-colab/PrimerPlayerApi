@@ -1,0 +1,45 @@
+// test: inventario/DescontarStockConcurrenteIT.java
+@SpringBootTest
+@Testcontainers
+class DescontarStockConcurrenteIT {
+
+    @Container @ServiceConnection
+    static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgres:18-alpine");
+
+    @Autowired InventarioOperaciones inventario;
+    @Autowired TransactionTemplate tx;
+    @Autowired JdbcTemplate jdbc;
+
+    @Test
+    void cincuentaHilosCompranElUltimoArticulo_soloUnoGana() throws Exception {
+        long id = crearProductoConStock(1);
+        int hilos = 50;
+        var listos = new CountDownLatch(1);
+        var exitos = new AtomicInteger();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i < hilos; i++) {
+                pool.submit(() -> {
+                    listos.await();
+                    try {
+                        tx.executeWithoutResult(s -> inventario.descontar(
+                            List.of(new LineaStock(id, 1)), TipoMovimiento.VENTA_MOSTRADOR, "TEST"));
+                        exitos.incrementAndGet();
+                    } catch (StockInsuficienteException esperado) { }
+                    return null;
+                });
+            }
+            listos.countDown();
+        }
+        assertThat(exitos.get()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT stock FROM producto WHERE id = ?", Integer.class, id)).isZero();
+    }
+}
+
+// test: inventario/AdminInventarioSeguridadTest.java — matriz rol × endpoint
+@WebMvcTest(AdminInventarioController.class)
+class AdminInventarioSeguridadTest {
+    @Test @WithAnonymousUser               void anonimo_401()   { /* POST ajustes → 401 */ }
+    @Test @WithMockUser(roles = "CLIENTE")  void cliente_403()   { /* → 403 */ }
+    @Test @WithMockUser(roles = "VENDEDOR") void vendedor_200()  { /* → 200 */ }
+    @Test @WithMockUser(roles = "ADMIN")    void admin_200()     { /* → 200 */ }
+}

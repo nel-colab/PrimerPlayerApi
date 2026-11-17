@@ -1,0 +1,30 @@
+// inventario/web/AdminInventarioController.java
+@RestController
+@RequestMapping("/api/v1/admin/inventario")
+@RequiredArgsConstructor
+class AdminInventarioController {
+
+    private final InventarioOperaciones inventario;
+    private final InventarioWebMapper mapper;
+
+    @PostMapping("/{productoId}/ajustes")
+    @PreAuthorize("hasAnyRole('VENDEDOR','ADMIN')")
+    StockResponse ajustar(@PathVariable long productoId,
+                          @Valid @RequestBody AjusteStockRequest req,
+                          @AuthenticationPrincipal UsuarioActual usuario) {
+        return mapper.toResponse(inventario.ajustar(productoId, req.delta(), req.motivo(), usuario.id()));
+    }
+}
+
+// inventario/web/dto/AjusteStockRequest.java
+record AjusteStockRequest(
+    @NotNull @Range(min = -9999, max = 9999) Integer delta,
+    @NotBlank @Size(max = 200) String motivo) {}
+
+record StockResponse(long productoId, int stock) {}
+
+// inventario/web/InventarioWebMapper.java
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
+interface InventarioWebMapper {
+    StockResponse toResponse(ResultadoAjuste r);
+}

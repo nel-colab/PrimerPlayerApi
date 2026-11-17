@@ -1,0 +1,38 @@
+// inventario/infrastructure/StockRepository.java
+interface StockRepository extends Repository<ProductoStock, Long> {
+
+    // Sin @Modifying: con RETURNING el UPDATE se ejecuta como consulta y devuelve el stock resultante.
+    // (@Modifying solo devuelve el conteo de filas.) Debe llamarse dentro de una transacción.
+    @Query(value = """
+        UPDATE producto SET stock = stock - :cantidad, actualizado_en = now()
+        WHERE id = :id AND eliminado_en IS NULL AND stock >= :cantidad
+        RETURNING stock
+        """, nativeQuery = true)
+    Optional<Integer> descontar(long id, int cantidad);   // vacío = sin stock suficiente
+
+    @Query(value = "SELECT stock FROM producto WHERE id = :id", nativeQuery = true)
+    int stockActual(long id);
+}
+
+// inventario/application/InventarioService.java
+@Service
+@RequiredArgsConstructor
+class InventarioService implements InventarioOperaciones {
+
+    private final StockRepository stock;
+    private final MovimientoStockRepository movimientos;
+    private final Clock clock;
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)    // la transacción la abre checkout o pos
+    public void descontar(List<LineaStock> lineas, TipoMovimiento tipo, String referencia) {
+        lineas.stream()
+              .sorted(Comparator.comparingLong(LineaStock::productoId))   // orden fijo: evita deadlocks
+              .forEach(l -> {
+                  int resultante = stock.descontar(l.productoId(), l.cantidad())
+                      .orElseThrow(() -> new StockInsuficienteException(
+                          l.productoId(), stock.stockActual(l.productoId())));
+                  movimientos.save(MovimientoStock.salida(l, tipo, referencia, resultante, clock.instant()));
+              });
+    }
+}

@@ -1,0 +1,150 @@
+{
+  "info": {
+    "name": "Primer Player — Catálogo e inventario",
+    "description": "Mantenedor de productos y stock. Ejecuta primero '0. Login vendedor' (o admin). Crear producto guarda {{productoId}} y {{version}}; cada respuesta con ETag actualiza {{version}}. Usuarios demo (perfil dev): admin@, vendedor@, cliente@primerplayer.cl con clave PrimerPlayer2026!",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "event": [{
+    "listen": "test",
+    "script": { "exec": [
+      "const etag = pm.response.headers.get('ETag');",
+      "if (etag) pm.collectionVariables.set('version', etag.replace(/\"/g, ''));"
+    ] }
+  }],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "password", "value": "PrimerPlayer2026!" },
+    { "key": "accessToken", "value": "" },
+    { "key": "productoId", "value": "" },
+    { "key": "version", "value": "0" }
+  ],
+  "item": [
+    {
+      "name": "0. Login vendedor",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"vendedor@primerplayer.cl\",\n  \"password\": \"{{password}}\"\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.to.have.status(200));",
+        "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+      ] } }]
+    },
+    {
+      "name": "0. Login admin",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@primerplayer.cl\",\n  \"password\": \"{{password}}\"\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.to.have.status(200));",
+        "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+      ] } }]
+    },
+    {
+      "name": "Maestros (públicos)",
+      "item": [
+        { "name": "Categorías", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/categorias" } },
+        { "name": "Franquicias", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/franquicias" } }
+      ]
+    },
+    {
+      "name": "Productos (admin)",
+      "item": [
+        {
+          "name": "Crear producto",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/productos",
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sobre Pokémon Black Bolt\",\n  \"descripcion\": \"Sobre de 10 cartas.\",\n  \"precio\": 4990,\n  \"categoria\": \"tcg-pokemon\",\n  \"tipo\": \"Sobre\",\n  \"idioma\": \"Inglés\",\n  \"franquicia\": \"Pokémon\",\n  \"linea\": \"Scarlet & Violet\",\n  \"codigoBarras\": null,\n  \"limitePorUsuario\": 4,\n  \"publicado\": true,\n  \"imagenes\": [\n    { \"url\": \"https://cdn.primerplayer.cl/black-bolt.webp\", \"portada\": true }\n  ]\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('productoId', pm.response.json().id);"
+          ] } }]
+        },
+        {
+          "name": "Listar / buscar",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/productos?q=black&estado=publicado&sort=nombre,asc&page=0&size=24",
+              "host": ["{{baseUrl}}"], "path": ["admin", "productos"],
+              "query": [
+                { "key": "q", "value": "black", "description": "nombre (sin tildes), id o código de barras" },
+                { "key": "categoria", "value": "figuras", "disabled": true, "description": "slug hoja o agrupadora; repetible" },
+                { "key": "estado", "value": "publicado", "description": "publicado | oculto | stock-bajo | agotado; repetible" },
+                { "key": "sort", "value": "nombre,asc", "description": "id | nombre | precio | stock | fecha" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "24" }
+              ]
+            }
+          }
+        },
+        { "name": "Indicadores", "request": { "method": "GET", "url": "{{baseUrl}}/admin/productos/indicadores" } },
+        { "name": "Obtener producto", "request": { "method": "GET", "url": "{{baseUrl}}/admin/productos/{{productoId}}" } },
+        {
+          "name": "Actualizar producto (If-Match)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "\"{{version}}\"" }
+            ],
+            "url": "{{baseUrl}}/admin/productos/{{productoId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sobre Pokémon Black Bolt (EN)\",\n  \"descripcion\": \"Sobre de 10 cartas.\",\n  \"precio\": 5490,\n  \"categoria\": \"tcg-pokemon\",\n  \"tipo\": \"Sobre\",\n  \"idioma\": \"Inglés\",\n  \"franquicia\": \"Pokémon\",\n  \"linea\": \"Scarlet & Violet\",\n  \"codigoBarras\": null,\n  \"limitePorUsuario\": 4,\n  \"publicado\": true,\n  \"imagenes\": [\n    { \"url\": \"https://cdn.primerplayer.cl/black-bolt.webp\", \"portada\": true }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Publicar / ocultar",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/productos/{{productoId}}/publicacion",
+            "body": { "mode": "raw", "raw": "{\n  \"publicado\": false\n}" }
+          }
+        },
+        { "name": "Eliminar (lógico)", "request": { "method": "DELETE", "url": "{{baseUrl}}/admin/productos/{{productoId}}" } }
+      ]
+    },
+    {
+      "name": "Inventario (admin)",
+      "item": [
+        {
+          "name": "Ajustar stock (+/-)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/inventario/{{productoId}}/ajustes",
+            "body": { "mode": "raw", "raw": "{\n  \"delta\": 12,\n  \"motivo\": \"Ingreso de mercadería, factura 1234\"\n}" }
+          }
+        },
+        {
+          "name": "Kardex (movimientos)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/inventario/{{productoId}}/movimientos?page=0&size=20" }
+        },
+        { "name": "Configuración (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/admin/inventario/configuracion" } },
+        {
+          "name": "Cambiar umbral stock bajo (ADMIN)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/inventario/configuracion",
+            "body": { "mode": "raw", "raw": "{\n  \"umbralStockBajo\": 3\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "info": {
+    "name": "Primer Player — Eventos y cumpleaños",
+    "description": "Agenda de la tienda. 1) Login vendedor y crea eventos. 2) Login cliente y solicita un cumpleaños. 3) Login vendedor y apruébalo desde la bandeja. Cada login guarda su token en {{accessToken}}. Usuarios demo (perfil dev) con clave PrimerPlayer2026!. Fechas sin zona = hora de Chile (lo que envía un datetime-local). Ajusta {{dia}} a una fecha futura (los cumpleaños exigen 48 h de anticipación).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+  "event": [{
+    "listen": "test",
+    "script": { "exec": [
+      "const etag = pm.response.headers.get('ETag');",
+      "if (etag) pm.collectionVariables.set('version', etag.replace(/\"/g, ''));"
+    ] }
+  }],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "password", "value": "PrimerPlayer2026!" },
+    { "key": "dia", "value": "2026-12-12" },
+    { "key": "accessToken", "value": "" },
+    { "key": "eventoId", "value": "" },
+    { "key": "version", "value": "0" },
+    { "key": "solicitudId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Logins",
+      "item": [
+        {
+          "name": "Login vendedor",
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"vendedor@primerplayer.cl\",\n  \"password\": \"{{password}}\"\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"] } }]
+        },
+        {
+          "name": "Login admin",
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@primerplayer.cl\",\n  \"password\": \"{{password}}\"\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"] } }]
+        },
+        {
+          "name": "Login cliente",
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"cliente@primerplayer.cl\",\n  \"password\": \"{{password}}\"\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Público",
+      "item": [
+        { "name": "Próximos encuentros", "request": { "auth": { "type": "noauth" }, "method": "GET",
+          "url": { "raw": "{{baseUrl}}/eventos?page=0&size=24", "host": ["{{baseUrl}}"], "path": ["eventos"],
+            "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "24" },
+              { "key": "tipo", "value": "league-challenge", "disabled": true },
+              { "key": "desde", "value": "{{dia}}", "disabled": true },
+              { "key": "hasta", "value": "2027-01-31", "disabled": true }] } } },
+        { "name": "Detalle de evento", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/eventos/{{eventoId}}" } },
+        { "name": "Bloques ocupados (agenda)", "request": { "auth": { "type": "noauth" }, "method": "GET",
+          "url": "{{baseUrl}}/agenda/ocupados?desde={{dia}}&hasta=2027-01-31" } }
+      ]
+    },
+    {
+      "name": "Admin · Eventos (vendedor/admin)",
+      "item": [
+        {
+          "name": "Crear League Challenge",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/admin/eventos",
+            "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"League Challenge de Diciembre\",\n  \"tipo\": \"league-challenge\",\n  \"fecha\": \"{{dia}}T15:00\",\n  \"lugar\": \"Av. Portales Ote. 1126, San Bernardo\",\n  \"cuposTotales\": 16,\n  \"precio\": 5000,\n  \"limitePorUsuario\": null,\n  \"descripcion\": \"Pon a prueba tu mazo en una tarde de estrategia y Pokémon TCG junto a la comunidad.\",\n  \"consideraciones\": [\n    \"Trae tu mazo preparado para jugar.\",\n    \"Confirma inscripción y cupos disponibles en tienda.\",\n    \"Llega con anticipación para revisar las indicaciones del torneo.\"\n  ],\n  \"imagen\": null,\n  \"publicado\": true\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('eventoId', pm.response.json().id);"] } }]
+        },
+        {
+          "name": "Crear lanzamiento (cartas / juegos de mesa)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/admin/eventos",
+            "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Lanzamiento nueva expansión\",\n  \"tipo\": \"lanzamiento\",\n  \"fecha\": \"{{dia}}T11:00\",\n  \"fechaFin\": \"{{dia}}T14:00\",\n  \"lugar\": \"Av. Portales Ote. 1126, San Bernardo\",\n  \"cuposTotales\": 30,\n  \"precio\": 0,\n  \"descripcion\": \"Llega la nueva edición: ven a abrir tus primeros sobres.\",\n  \"consideraciones\": [\"Cupos limitados.\"],\n  \"publicado\": true\n}" } }
+        },
+        { "name": "Listar (incluye ocultos)", "request": { "method": "GET", "url": "{{baseUrl}}/admin/eventos?page=0&size=24" } },
+        { "name": "Obtener", "request": { "method": "GET", "url": "{{baseUrl}}/admin/eventos/{{eventoId}}" } },
+        {
+          "name": "Actualizar (If-Match)",
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "If-Match", "value": "\"{{version}}\"" }],
+            "url": "{{baseUrl}}/admin/eventos/{{eventoId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"League Challenge de Diciembre\",\n  \"tipo\": \"league-challenge\",\n  \"fecha\": \"{{dia}}T15:00\",\n  \"fechaFin\": \"{{dia}}T19:00\",\n  \"lugar\": \"Av. Portales Ote. 1126, San Bernardo\",\n  \"cuposTotales\": 20,\n  \"precio\": 5000,\n  \"limitePorUsuario\": 2,\n  \"descripcion\": \"Pon a prueba tu mazo en una tarde de estrategia y Pokémon TCG junto a la comunidad.\",\n  \"consideraciones\": [\"Trae tu mazo preparado para jugar.\"],\n  \"publicado\": true\n}" } }
+        },
+        { "name": "Publicar / ocultar", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "url": "{{baseUrl}}/admin/eventos/{{eventoId}}/publicacion", "body": { "mode": "raw", "raw": "{\n  \"publicado\": false\n}" } } },
+        { "name": "Eliminar (lógico)", "request": { "method": "DELETE", "url": "{{baseUrl}}/admin/eventos/{{eventoId}}" } }
+      ]
+    },
+    {
+      "name": "Cumpleaños · Cliente",
+      "item": [
+        {
+          "name": "Solicitar bloque",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/me/solicitudes-cumpleanos",
+            "body": { "mode": "raw", "raw": "{\n  \"inicio\": \"{{dia}}T19:00\",\n  \"fin\": \"{{dia}}T22:00\",\n  \"festejado\": \"Martina (8 años)\",\n  \"invitados\": 15,\n  \"telefono\": \"+56912345678\",\n  \"comentario\": \"Queremos un torneo de Pokémon para los niños\"\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('solicitudId', pm.response.json().id);"] } }]
+        },
+        { "name": "Mis solicitudes", "request": { "method": "GET", "url": "{{baseUrl}}/me/solicitudes-cumpleanos" } },
+        { "name": "Cancelar (solo pendiente)", "request": { "method": "POST", "url": "{{baseUrl}}/me/solicitudes-cumpleanos/{{solicitudId}}/cancelacion" } }
+      ]
+    },
+    {
+      "name": "Cumpleaños · Tienda (vendedor/admin)",
+      "item": [
+        { "name": "Bandeja (pendientes)", "request": { "method": "GET", "url": "{{baseUrl}}/admin/solicitudes-cumpleanos?estado=PENDIENTE" } },
+        {
+          "name": "Aprobar (crea el evento)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/solicitudes-cumpleanos/{{solicitudId}}/aprobacion",
+            "body": { "mode": "raw", "raw": "{\n  \"titulo\": null,\n  \"descripcion\": null,\n  \"consideraciones\": [\"La tienda estará cerrada al público durante el evento.\"],\n  \"publicado\": true\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 200) pm.collectionVariables.set('eventoId', pm.response.json().eventoId);"] } }]
+        },
+        {
+          "name": "Rechazar",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/solicitudes-cumpleanos/{{solicitudId}}/rechazo",
+            "body": { "mode": "raw", "raw": "{\n  \"motivo\": \"Ese día tenemos inventario.\"\n}" } }
+        }
+      ]
+    }
+  ]
+}

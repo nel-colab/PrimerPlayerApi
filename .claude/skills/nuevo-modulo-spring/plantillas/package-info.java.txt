@@ -1,0 +1,9 @@
+/**
+ * Módulo inventario: stock atómico, kardex y umbral de stock bajo.
+ * Solo los paquetes api y events son visibles para otros módulos.
+ */
+@org.springframework.modulith.ApplicationModule(
+    displayName = "Inventario",
+    allowedDependencies = { "catalogo :: api" }
+)
+package cl.primerplayer.inventario;

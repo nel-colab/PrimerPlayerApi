@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Primer Player (local)",
+      "Group": "Primer Player",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "primerplayer",
+      "Username": "pp",
+      "SSLMode": "prefer",
+      "PasswordExecCommand": "echo pp"
+    }
+  }
+}

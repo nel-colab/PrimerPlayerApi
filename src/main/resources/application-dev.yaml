@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/primerplayer
+    username: pp
+    password: pp
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed-dev
+  mail:
+    host: localhost
+    port: 1025
+
+logging:
+  level:
+    org.flywaydb: info
+
+pp:
+  auth:
+    jwt:
+      secreto: 3NPlZBofKyvjcAMS490Q47rDYmPVZCK+KyFgifKH7e8=   # solo desarrollo local
+    cookie:
+      segura: false   # http://localhost

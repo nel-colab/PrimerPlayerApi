@@ -1,0 +1,49 @@
+// shared/api/ExcepcionNegocio.java — base de todos los errores de negocio
+package cl.primerplayer.shared.api;
+
+import org.springframework.http.HttpStatus;
+import java.util.List;
+
+public abstract class ExcepcionNegocio extends RuntimeException {
+    private final String code;          // kebab-case: out-of-stock, purchase-limit, ...
+    private final HttpStatus status;
+    private final List<ErrorLinea> errores;
+
+    protected ExcepcionNegocio(String code, HttpStatus status, String detalle, List<ErrorLinea> errores) {
+        super(detalle);
+        this.code = code;
+        this.status = status;
+        this.errores = errores == null ? List.of() : List.copyOf(errores);
+    }
+
+    public String code() { return code; }
+    public HttpStatus status() { return status; }
+    public List<ErrorLinea> errores() { return errores; }
+
+    public record ErrorLinea(int line, String itemType, long itemId, String code, Integer maxAllowed) {}
+}
+
+// inventario/api/StockInsuficienteException.java — ejemplo de error concreto
+package cl.primerplayer.inventario.api;
+
+public class StockInsuficienteException extends ExcepcionNegocio {
+    public StockInsuficienteException(long productoId, int disponible) {
+        super(disponible == 0 ? "out-of-stock" : "stock-limit", HttpStatus.CONFLICT,
+              "Stock insuficiente para el producto " + productoId, null);
+    }
+}
+
+// shared/web/ManejadorErrores.java — convierte a application/problem+json (RFC 9457)
+@RestControllerAdvice
+class ManejadorErrores {
+    @ExceptionHandler(ExcepcionNegocio.class)
+    ProblemDetail negocio(ExcepcionNegocio ex, HttpServletRequest req) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
+        pd.setType(URI.create("https://api.primerplayer.cl/problemas/" + ex.code()));
+        pd.setTitle(Titulos.de(ex.code()));
+        pd.setProperty("code", ex.code());
+        pd.setProperty("requestId", MDC.get("requestId"));
+        if (!ex.errores().isEmpty()) pd.setProperty("errors", ex.errores());
+        return pd;
+    }
+}

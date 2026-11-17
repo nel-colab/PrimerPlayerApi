@@ -1,0 +1,10 @@
+pp:
+  tareas:
+    habilitadas: false   # las pruebas invocan las tareas directamente
+  media:
+    endpoint: http://localhost:1   # nunca el MinIO real: las pruebas usan un almacén en memoria
+  auth:
+    jwt:
+      secreto: dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0   # solo pruebas
+    cookie:
+      segura: false

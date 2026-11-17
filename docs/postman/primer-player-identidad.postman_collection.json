@@ -1,0 +1,114 @@
+{
+  "info": {
+    "name": "Primer Player — Identidad",
+    "description": "Registro, login y sesión actual. Ejecuta 'Login' y el accessToken queda guardado en la variable {{accessToken}} para las demás solicitudes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "email", "value": "ash@pueblopaleta.cl" },
+    { "key": "password", "value": "Pikachu2026!" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Registro",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/registro",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Ash Ketchum\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('201 Created', () => pm.response.to.have.status(201));",
+          "pm.test('rol usuario', () => pm.expect(pm.response.json().role).to.eql('usuario'));"
+        ] }
+      }]
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('200 OK', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.collectionVariables.set('accessToken', body.accessToken);",
+          "pm.test('cookie pp_rt', () => pm.expect(pm.response.headers.get('Set-Cookie')).to.include('pp_rt='));"
+        ] }
+      }]
+    },
+    {
+      "name": "Login — contraseña incorrecta (401)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"incorrecta\"\n}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('401 unauthorized', () => { pm.response.to.have.status(401); pm.expect(pm.response.json().code).to.eql('unauthorized'); });"
+        ] }
+      }]
+    },
+    {
+      "name": "Mi usuario (GET /me)",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "url": "{{baseUrl}}/me"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] }
+      }]
+    },
+    {
+      "name": "Refresh (renueva el access token)",
+      "request": {
+        "method": "POST",
+        "description": "Usa la cookie pp_rt guardada por el Login y exige X-Requested-With: pp-web. Rota la cookie: el valor anterior deja de servir.",
+        "header": [{ "key": "X-Requested-With", "value": "pp-web" }],
+        "url": "{{baseUrl}}/auth/refresh"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('200 OK', () => pm.response.to.have.status(200));",
+          "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);",
+          "pm.test('cookie rotada', () => pm.expect(pm.response.headers.get('Set-Cookie')).to.include('pp_rt='));"
+        ] }
+      }]
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "method": "POST",
+        "description": "Postman envía solo la cookie pp_rt que guardó en el Login (Cookies → localhost). Revoca esa sesión y borra la cookie. El accessToken sigue siendo válido hasta que expire (15 min).",
+        "url": "{{baseUrl}}/auth/logout"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('204 No Content', () => pm.response.to.have.status(204));",
+          "pm.test('borra la cookie', () => pm.expect(pm.response.headers.get('Set-Cookie')).to.include('Max-Age=0'));"
+        ] }
+      }]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: primer-player-api
+  servlet:
+    multipart:                   # el servicio valida 5 MB con un mensaje claro; aquí solo un tope de seguridad
+      max-file-size: 6MB
+      max-request-size: 6MB
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none   # el esquema lo maneja solo Flyway
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.default_batch_fetch_size: 50   # evita N+1 al cargar categorías/franquicias de una página
+  flyway:
+    locations: classpath:db/migration
+  modulith:
+    events:
+      # Al completarse, la publicación se borra del outbox: los eventos con tokens (verificación, recuperación)
+      # no quedan guardados en la base después de enviar el correo.
+      completion-mode: delete
+      republish-outstanding-events-on-restart: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  api-docs:
+    path: /api/v1/openapi.json
+
+pp:
+  media:                         # S3 compatible (MinIO en local: docker compose)
+    endpoint: ${PP_MEDIA_ENDPOINT:http://localhost:9000}
+    region: ${PP_MEDIA_REGION:us-east-1}
+    access-key: ${PP_MEDIA_ACCESS_KEY:ppminio}
+    secret-key: ${PP_MEDIA_SECRET_KEY:ppminio123}
+    url-publica: ${PP_MEDIA_URL_PUBLICA:http://localhost:9000}   # base pública de las imágenes
+  checkout:
+    reserva-minutos: 15          # stock y cupos reservados mientras el cliente paga
+    url-retorno: ${PP_CHECKOUT_URL_RETORNO:http://localhost:8080/api/v1/pagos/webpay/retorno}
+    url-resultado: ${PP_CHECKOUT_URL_RESULTADO:http://localhost:4200/pago/resultado}
+  webpay:
+    ambiente: ${PP_WEBPAY_AMBIENTE:integracion}      # integracion | produccion
+    codigo-comercio: ${PP_WEBPAY_CODIGO_COMERCIO:}   # vacío en integración = credenciales públicas del SDK
+    api-key: ${PP_WEBPAY_API_KEY:}
+    url-formulario: ${PP_WEBPAY_URL_FORMULARIO:https://webpay3gint.transbank.cl/webpayserver/initTransaction}
+  auth:
+    jwt:
+      secreto: ${PP_AUTH_JWT_SECRETO:}   # Base64, >= 256 bits. Obligatorio fuera de dev.
+      ttl: 15m
+    refresh-ttl: 30d
+    refresh-gracia: 10s   # carrera entre pestañas: 401 sin revocar la familia
+    verificacion-ttl: 24h
+    bloqueo:
+      max-intentos: 5
+      duracion: 15m
+    cookie:
+      segura: true
