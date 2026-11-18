@@ -86,8 +86,9 @@ class PedidosServiceTest {
     }
 
     final PedidosEnMemoria repo = new PedidosEnMemoria();
+    final List<Object> eventos = new ArrayList<>();
     final PedidosService service = new PedidosService(repo, new UsuariosFalsos(), ids -> Map.of(),
-            Clock.fixed(AHORA, ZoneOffset.UTC));
+            Clock.fixed(AHORA, ZoneOffset.UTC), eventos::add);
 
     Pedido web(long id, String codigo, long cliente, EstadoPedido estado) {
         Instant t = AHORA.minusSeconds(3600);
@@ -125,21 +126,22 @@ class PedidosServiceTest {
     @Test
     void marcarRetiro_cambiaEstadoYActualizaFecha() {
         web(1, "PP-2026-000001", 10, EstadoPedido.PAGADO);
-        var listo = service.marcarRetiro("pp-2026-000001", EstadoPedido.LISTO_RETIRO);
+        var listo = service.marcarRetiro("pp-2026-000001", EstadoPedido.LISTO_RETIRO, false);
         assertThat(listo.estado()).isEqualTo(EstadoPedido.LISTO_RETIRO);
         assertThat(listo.actualizadoEn()).isEqualTo(AHORA);
+        assertThat(eventos).isEmpty();
     }
 
     @Test
     void marcarRetiro_estadoNoDeRetiro_validation() {
         web(1, "PP-2026-000001", 10, EstadoPedido.PAGADO);
-        assertThatThrownBy(() -> service.marcarRetiro("PP-2026-000001", EstadoPedido.REEMBOLSADO))
+        assertThatThrownBy(() -> service.marcarRetiro("PP-2026-000001", EstadoPedido.REEMBOLSADO, false))
                 .isInstanceOf(ValidacionException.class);
     }
 
     @Test
     void marcarRetiro_codigoInexistente_404() {
-        assertThatThrownBy(() -> service.marcarRetiro("PP-2026-999999", EstadoPedido.ENTREGADO))
+        assertThatThrownBy(() -> service.marcarRetiro("PP-2026-999999", EstadoPedido.ENTREGADO, false))
                 .isInstanceOf(RecursoNoEncontradoException.class);
     }
 
@@ -147,7 +149,31 @@ class PedidosServiceTest {
     void marcarRetiro_siOtroProcesoLoCambioAntes_orderInvalidState() {
         web(1, "PP-2026-000001", 10, EstadoPedido.PAGADO);
         repo.otroProcesoGana = true;
-        assertThatThrownBy(() -> service.marcarRetiro("PP-2026-000001", EstadoPedido.ENTREGADO))
+        assertThatThrownBy(() -> service.marcarRetiro("PP-2026-000001", EstadoPedido.ENTREGADO, false))
                 .isInstanceOf(EstadoPedidoInvalidoException.class);
+    }
+
+    @Test
+    void marcarRetiro_notificaSoloCuandoSeSolicitaParaListoRetiro() {
+        web(1, "PP-2026-000001", 10, EstadoPedido.PAGADO);
+
+        service.marcarRetiro("PP-2026-000001", EstadoPedido.LISTO_RETIRO, true);
+
+        assertThat(eventos).singleElement().isInstanceOf(cl.primerplayer.ventas.events.PedidoListoRetiro.class);
+        var evento = (cl.primerplayer.ventas.events.PedidoListoRetiro) eventos.getFirst();
+        assertThat(evento.codigo()).isEqualTo("PP-2026-000001");
+        assertThat(evento.items()).singleElement().satisfies(item -> {
+            assertThat(item.nombre()).isEqualTo("Sobre");
+            assertThat(item.cantidad()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void marcarRetiro_noNotificaAlEntregarAunqueFlagSeaTrue() {
+        web(1, "PP-2026-000001", 10, EstadoPedido.PAGADO);
+
+        service.marcarRetiro("PP-2026-000001", EstadoPedido.ENTREGADO, true);
+
+        assertThat(eventos).isEmpty();
     }
 }

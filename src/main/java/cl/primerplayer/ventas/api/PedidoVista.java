@@ -6,7 +6,7 @@ import java.util.List;
 import cl.primerplayer.pagos.api.ConsultarPagosUseCase.PagoVista;
 
 /**
- * Pedido listo para mostrar: incluye correo y nombre del cliente y nombre del vendedor (resueltos en identidad).
+ * Pedido listo para mostrar: incluye datos de contacto del cliente y nombre del vendedor (resueltos en identidad).
  * Los nombres de ítems y precios son el snapshot del momento de la compra.
  */
 public record PedidoVista(
@@ -18,6 +18,8 @@ public record PedidoVista(
         long clienteId,
         String clienteEmail,
         String clienteNombre,
+        String clienteTelefono,
+        String clienteRut,
         Long vendedorId,
         String vendedorNombre,
         Instant creadoEn,

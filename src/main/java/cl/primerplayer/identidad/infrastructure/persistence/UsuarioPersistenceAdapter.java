@@ -92,7 +92,8 @@ class UsuarioPersistenceAdapter implements UsuarioRepositorio {
     }
 
     private static Usuario aDominio(UsuarioEntity e) {
-        return Usuario.reconstituir(e.getId(), e.getEmail(), e.getNombre(), e.getPasswordHash(), e.getRol(),
+        return Usuario.reconstituir(e.getId(), e.getEmail(), e.getNombre(), e.getTelefono(), e.getRut(),
+                e.getPasswordHash(), e.getRol(),
                 e.isActivo(), e.isAnonimo(), e.getEmailVerificadoEn(), e.getIntentosFallidos(),
                 e.getBloqueadoHasta(), e.getCreadoEn(), e.getEliminadoEn());
     }

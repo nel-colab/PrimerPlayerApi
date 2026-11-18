@@ -4,11 +4,11 @@ package cl.primerplayer.ventas.api;
 public interface GestionarPedidosUseCase {
 
     /**
-     * Marca un pedido pagado como {@code LISTO_RETIRO} o {@code ENTREGADO}.
+     * Marca un pedido web pagado como {@code LISTO_RETIRO} o {@code ENTREGADO}; opcionalmente notifica al cliente.
      *
      * @throws cl.primerplayer.shared.api.RecursoNoEncontradoException si el código no existe
      * @throws cl.primerplayer.shared.api.ValidacionException si {@code nuevo} no es LISTO_RETIRO ni ENTREGADO
      * @throws EstadoPedidoInvalidoException si el pedido no puede pasar a ese estado (409 {@code order-invalid-state})
      */
-    PedidoVista marcarRetiro(String codigo, EstadoPedido nuevo);
+    PedidoVista marcarRetiro(String codigo, EstadoPedido nuevo, boolean notificarCliente);
 }

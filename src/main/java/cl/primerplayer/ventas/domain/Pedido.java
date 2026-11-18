@@ -56,9 +56,9 @@ public record Pedido(
     }
 
     /**
-     * Valida el paso a LISTO_RETIRO o ENTREGADO hecho por la tienda.
+     * Valida el paso a LISTO_RETIRO o ENTREGADO hecho por la tienda para cualquier pedido web.
      *
-     * @throws EstadoPedidoInvalidoException si el estado actual no lo permite o el pedido no tiene productos que retirar
+     * @throws EstadoPedidoInvalidoException si el estado actual no lo permite o es de mostrador
      */
     public void validarRetiro(EstadoPedido nuevo) {
         if (!ESTADOS_DE_RETIRO.contains(nuevo)) {
@@ -66,9 +66,6 @@ public record Pedido(
         }
         if (canal == CanalPedido.TIENDA) {
             throw new EstadoPedidoInvalidoException("Las ventas de mostrador se entregan en el momento.");
-        }
-        if (items.stream().noneMatch(Item::esProducto)) {
-            throw new EstadoPedidoInvalidoException("El pedido solo tiene inscripciones a eventos: no hay nada que retirar.");
         }
         if (!puedePasar(estado, nuevo)) {
             throw new EstadoPedidoInvalidoException(

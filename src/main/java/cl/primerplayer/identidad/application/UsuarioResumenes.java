@@ -8,6 +8,6 @@ final class UsuarioResumenes {
     private UsuarioResumenes() {}
 
     static UsuarioResumen de(Usuario u) {
-        return new UsuarioResumen(u.id(), u.email(), u.nombre(), u.rol());
+        return new UsuarioResumen(u.id(), u.email(), u.nombre(), u.rol(), u.telefono(), u.rut());
     }
 }

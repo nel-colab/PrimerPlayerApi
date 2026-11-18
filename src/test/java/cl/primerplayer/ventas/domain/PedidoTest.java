@@ -52,10 +52,9 @@ class PedidoTest {
     }
 
     @Test
-    void retiro_pedidoSoloDeEventos_noHayNadaQueRetirar() {
-        assertThatThrownBy(() -> pedido(CanalPedido.WEB, EstadoPedido.PAGADO, List.of(EVENTO)).validarRetiro(EstadoPedido.LISTO_RETIRO))
-                .isInstanceOf(EstadoPedidoInvalidoException.class).hasMessageContaining("inscripciones");
-        // Mixto sí se retira (los productos)
+    void retiro_pedidoSoloDeEventosPuedeMarcarseListo() {
+        assertThatCode(() -> pedido(CanalPedido.WEB, EstadoPedido.PAGADO, List.of(EVENTO)).validarRetiro(EstadoPedido.LISTO_RETIRO))
+                .doesNotThrowAnyException();
         assertThatCode(() -> pedido(CanalPedido.WEB, EstadoPedido.PAGADO, List.of(PRODUCTO, EVENTO)).validarRetiro(EstadoPedido.LISTO_RETIRO))
                 .doesNotThrowAnyException();
     }

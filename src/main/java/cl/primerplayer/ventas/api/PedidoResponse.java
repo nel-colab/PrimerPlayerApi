@@ -20,6 +20,10 @@ public record PedidoResponse(
         @Schema(description = "CLP") long total,
         @Schema(description = "Correo del cliente") String email,
         String customerName,
+        @Schema(nullable = true, description = "Teléfono del perfil del cliente; null en ventas de mostrador")
+        String phone,
+        @Schema(nullable = true, description = "RUT del perfil del cliente; null en ventas de mostrador")
+        String rut,
         @Schema(description = "Nombre del vendedor (solo ventas de mostrador)") String seller,
         OffsetDateTime createdAt,
         OffsetDateTime paidAt,
@@ -60,7 +64,8 @@ public record PedidoResponse(
 
     public static PedidoResponse de(PedidoVista p) {
         return new PedidoResponse(p.codigo(), p.estado().name(), p.canal().valor(), p.total(), p.clienteEmail(),
-                p.clienteNombre(), p.vendedorNombre(), FechasTienda.enZona(p.creadoEn()), FechasTienda.enZona(p.pagadoEn()),
+                p.clienteNombre(), p.clienteTelefono(), p.clienteRut(), p.vendedorNombre(),
+                FechasTienda.enZona(p.creadoEn()), FechasTienda.enZona(p.pagadoEn()),
                 FechasTienda.enZona(p.actualizadoEn()),
                 p.items().stream().map(i -> new Item(i.tipo(), i.itemId(), i.nombre(), i.cantidad(), i.precioUnitario(),
                         i.subtotal())).toList(),

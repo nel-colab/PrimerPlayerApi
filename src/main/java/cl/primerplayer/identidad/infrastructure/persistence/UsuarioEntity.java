@@ -34,6 +34,12 @@ class UsuarioEntity {
     @Column(nullable = false, length = 120)
     private String nombre;
 
+    @Column(length = 20)
+    private String telefono;
+
+    @Column(length = 12)
+    private String rut;
+
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
 

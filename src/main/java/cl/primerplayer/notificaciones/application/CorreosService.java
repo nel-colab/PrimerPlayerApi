@@ -24,6 +24,7 @@ import cl.primerplayer.notificaciones.application.port.out.EnvioCorreo;
 import cl.primerplayer.notificaciones.infrastructure.CorreoEnviadoRepositorio;
 import cl.primerplayer.shared.api.FechasTienda;
 import cl.primerplayer.ventas.events.PedidoConfirmado;
+import cl.primerplayer.ventas.events.PedidoListoRetiro;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -96,6 +97,31 @@ class CorreosService {
                 Ver mis pedidos: %s/cuenta/perfil
                 """.formatted(cliente.nombre(), e.codigo(),
                 java.text.NumberFormat.getIntegerInstance(java.util.Locale.of("es", "CL")).format(e.total()), urlFront));
+    }
+
+    @Async
+    @TransactionalEventListener
+    void alListoParaRetiro(PedidoListoRetiro e) {
+        UsuarioResumen cliente = usuarios.buscarPorIds(List.of(e.clienteId())).get(e.clienteId());
+        if (cliente == null) {
+            return;
+        }
+        String items = e.items().stream()
+                .map(i -> "- %s × %d".formatted(i.nombre(), i.cantidad()))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        enviarUnaVez(cliente.email(), "pedido-listo-retiro", e.codigo(),
+                "Tu pedido " + e.codigo() + " está listo para retirar en tienda", """
+                Hola %s:
+
+                Tu pedido %s está listo para retirar en tienda.
+
+                Ítems:
+                %s
+
+                Dirección de retiro: Av. Portales Ote. 1126, San Bernardo
+                Preséntate con este código al llegar a la tienda.
+                Código: %s
+                """.formatted(cliente.nombre(), e.codigo(), items, e.codigo()));
     }
 
     @Async

@@ -440,6 +440,12 @@ Tarjetas de prueba: ver la documentación de Webpay Plus en `transbankdevelopers
 
 Todos bajo `/api/v1`. El detalle de parámetros y respuestas está en Swagger UI.
 
+`GET /admin/pedidos` incluye `phone` y `rut` del perfil del cliente (`null` si no están informados o si el canal es
+`tienda`). `PATCH /admin/pedidos/{codigo}/estado` acepta `{ "estado": "LISTO_RETIRO" | "ENTREGADO",
+"notificarCliente": true | false }`. `notificarCliente: true` envía un correo con el detalle del pedido al marcarlo
+`LISTO_RETIRO`; se ignora al marcar `ENTREGADO`. Ambos estados se permiten para pedidos web de productos, eventos o
+mixtos. Las ventas de mostrador no admiten esta transición.
+
 ### Prompts para el frontend
 
 Instrucciones listas para entregar al agente que trabaja en `PrimerPlayerFront`:

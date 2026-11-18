@@ -12,6 +12,8 @@ public final class Usuario {
     private final Long id;
     private final String email;
     private final String nombre;
+    private final String telefono;
+    private final String rut;
     private final String passwordHash;
     private final Rol rol;
     private final boolean activo;
@@ -22,12 +24,14 @@ public final class Usuario {
     private final Instant creadoEn;
     private final Instant eliminadoEn;
 
-    private Usuario(Long id, String email, String nombre, String passwordHash, Rol rol, boolean activo,
+    private Usuario(Long id, String email, String nombre, String telefono, String rut, String passwordHash, Rol rol, boolean activo,
                     boolean anonimo, Instant emailVerificadoEn, int intentosFallidos, Instant bloqueadoHasta,
                     Instant creadoEn, Instant eliminadoEn) {
         this.id = id;
         this.email = Objects.requireNonNull(email);
         this.nombre = Objects.requireNonNull(nombre);
+        this.telefono = telefono;
+        this.rut = rut;
         this.passwordHash = passwordHash;
         this.rol = Objects.requireNonNull(rol);
         this.activo = activo;
@@ -41,13 +45,13 @@ public final class Usuario {
 
     /** Registro público: siempre CLIENTE, activo y con el correo sin verificar. */
     public static Usuario registrarCliente(String nombre, String email, String passwordHash, Instant ahora) {
-        return new Usuario(null, normalizarEmail(email), nombre.strip(), Objects.requireNonNull(passwordHash),
+        return new Usuario(null, normalizarEmail(email), nombre.strip(), null, null, Objects.requireNonNull(passwordHash),
                 Rol.CLIENTE, true, false, null, 0, null, ahora, null);
     }
 
     /** Usuario creado por la tienda (o la semilla de desarrollo): rol a elección y correo ya verificado. */
     public static Usuario crearVerificado(String nombre, String email, String passwordHash, Rol rol, Instant ahora) {
-        return new Usuario(null, normalizarEmail(email), nombre.strip(), Objects.requireNonNull(passwordHash),
+        return new Usuario(null, normalizarEmail(email), nombre.strip(), null, null, Objects.requireNonNull(passwordHash),
                 rol, true, false, ahora, 0, null, ahora, null);
     }
 
@@ -55,7 +59,15 @@ public final class Usuario {
                                        boolean activo, boolean anonimo, Instant emailVerificadoEn,
                                        int intentosFallidos, Instant bloqueadoHasta, Instant creadoEn,
                                        Instant eliminadoEn) {
-        return new Usuario(id, email, nombre, passwordHash, rol, activo, anonimo, emailVerificadoEn,
+        return reconstituir(id, email, nombre, null, null, passwordHash, rol, activo, anonimo, emailVerificadoEn,
+                intentosFallidos, bloqueadoHasta, creadoEn, eliminadoEn);
+    }
+
+    public static Usuario reconstituir(Long id, String email, String nombre, String telefono, String rut,
+                                       String passwordHash, Rol rol, boolean activo, boolean anonimo,
+                                       Instant emailVerificadoEn, int intentosFallidos, Instant bloqueadoHasta,
+                                       Instant creadoEn, Instant eliminadoEn) {
+        return new Usuario(id, email, nombre, telefono, rut, passwordHash, rol, activo, anonimo, emailVerificadoEn,
                 intentosFallidos, bloqueadoHasta, creadoEn, eliminadoEn);
     }
 
@@ -80,6 +92,8 @@ public final class Usuario {
     public Long id() { return id; }
     public String email() { return email; }
     public String nombre() { return nombre; }
+    public String telefono() { return telefono; }
+    public String rut() { return rut; }
     public String passwordHash() { return passwordHash; }
     public Rol rol() { return rol; }
     public boolean activo() { return activo; }

@@ -1,13 +1,16 @@
 package cl.primerplayer.ventas;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -36,11 +39,12 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import cl.primerplayer.TestcontainersConfiguration;
 import cl.primerplayer.TokensDePrueba;
 import cl.primerplayer.TokensDePrueba.UsuarioConToken;
+import cl.primerplayer.notificaciones.CorreosCapturados;
 import cl.primerplayer.shared.api.Rol;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, CorreosCapturados.Config.class})
 @ActiveProfiles("test")
 class PedidosIntegracionTest {
 
@@ -50,6 +54,7 @@ class PedidosIntegracionTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired JwtEncoder encoder;
+    @Autowired CorreosCapturados correos;
 
     UsuarioConToken cliente, otroCliente, vendedor, admin;
     long productoId, eventoId;
@@ -103,8 +108,12 @@ class PedidosIntegracionTest {
     }
 
     ResultActions marcar(UsuarioConToken u, String codigo, String estado) throws Exception {
+        return marcar(u, codigo, estado, false);
+    }
+
+    ResultActions marcar(UsuarioConToken u, String codigo, String estado, boolean notificarCliente) throws Exception {
         return como(u, patch(ADMIN + "/" + codigo + "/estado").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"estado\":\"" + estado + "\"}"));
+                .content("{\"estado\":\"" + estado + "\",\"notificarCliente\":" + notificarCliente + "}"));
     }
 
     // ---------- mis pedidos ----------
@@ -160,6 +169,23 @@ class PedidosIntegracionTest {
     }
 
     @Test
+    void panel_incluyeTelefonoYRutDelCliente_yNullEnVentasDeMostrador() throws Exception {
+        jdbc.update("UPDATE usuario SET telefono = ?, rut = ? WHERE id = ?",
+                "+56 9 1234 5678", "12.345.678-5", cliente.id());
+        String web = pedido("CONTACTO", cliente, "web", "PAGADO", true, false, Instant.now());
+        String tienda = pedido("MOSTRADOR", cliente, "tienda", "ENTREGADO", true, false, Instant.now());
+
+        como(vendedor, get(ADMIN).param("codigo", web))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].phone").value("+56 9 1234 5678"))
+                .andExpect(jsonPath("$.content[0].rut").value("12.345.678-5"));
+        como(vendedor, get(ADMIN).param("codigo", tienda))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].phone").value(nullValue()))
+                .andExpect(jsonPath("$.content[0].rut").value(nullValue()));
+    }
+
+    @Test
     void panel_rangoDeFechasEnDiasDeChile() throws Exception {
         Instant hace10Dias = Instant.now().minus(10, ChronoUnit.DAYS);
         String viejo = pedido("V", cliente, "web", "ENTREGADO", true, false, hace10Dias);
@@ -196,16 +222,35 @@ class PedidosIntegracionTest {
         String soloEvento = pedido("E", cliente, "web", "PAGADO", false, true, Instant.now());
         String mostrador = pedido("M", cliente, "tienda", "PAGADO", true, false, Instant.now());
 
-        for (String codigo : List.of(pendiente, soloEvento, mostrador)) {
+        for (String codigo : List.of(pendiente, mostrador)) {
             marcar(vendedor, codigo, "ENTREGADO")
                     .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("order-invalid-state"));
         }
+        marcar(vendedor, soloEvento, "LISTO_RETIRO")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("LISTO_RETIRO"));
         marcar(vendedor, web("X", "PAGADO"), "REEMBOLSADO")
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("validation"));
         marcar(vendedor, web("Y", "PAGADO"), "NO-EXISTE")
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("validation"));
         marcar(vendedor, prefijo + "INEXISTENTE", "ENTREGADO")
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("item-unavailable"));
+    }
+
+    @Test
+    void retiro_notificarCliente_enviaCorreoConCodigoItemsYDireccion() throws Exception {
+        String codigo = pedido("MAIL", cliente, "web", "PAGADO", false, true, Instant.now());
+
+        marcar(vendedor, codigo, "LISTO_RETIRO", true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LISTO_RETIRO"));
+
+        await().atMost(Duration.ofSeconds(5)).until(() -> correos.para(cliente.email()).stream()
+                .anyMatch(c -> c.asunto().contains("está listo para retirar")));
+        var correo = correos.para(cliente.email()).stream()
+                .filter(c -> c.asunto().contains("está listo para retirar")).findFirst().orElseThrow();
+        assertThat(correo.asunto()).contains(codigo);
+        assertThat(correo.texto()).contains(codigo, "Torneo de prueba", "Av. Portales Ote. 1126, San Bernardo",
+                "Preséntate con este código al llegar a la tienda.");
     }
 
     @Test

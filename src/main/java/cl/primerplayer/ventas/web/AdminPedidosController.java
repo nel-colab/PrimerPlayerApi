@@ -65,9 +65,11 @@ class AdminPedidosController {
 
     @PatchMapping("/{codigo}/estado")
     @Operation(summary = "Marcar un pedido web pagado como LISTO_RETIRO o ENTREGADO",
-            description = "Errores: validation (400), item-unavailable (404), order-invalid-state (409).")
+            description = "Con notificarCliente=true envía correo al pasar a LISTO_RETIRO. Errores: validation (400), "
+                    + "item-unavailable (404), order-invalid-state (409).")
     PedidoResponse cambiarEstado(@PathVariable String codigo, @Valid @RequestBody EstadoPedidoRequest req) {
-        return mapper.toResponse(gestionar.marcarRetiro(codigo, VentasWebMapper.estadoDe("estado", req.estado())));
+        return mapper.toResponse(gestionar.marcarRetiro(codigo,
+                VentasWebMapper.estadoDe("estado", req.estado()), req.notificarCliente()));
     }
 
     /** Una fecha sola ({@code 2026-11-30}) incluye ese día completo: el límite es el inicio del día siguiente. */

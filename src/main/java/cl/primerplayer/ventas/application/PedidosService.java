@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import cl.primerplayer.ventas.api.GestionarPedidosUseCase;
 import cl.primerplayer.ventas.api.PedidoVista;
 import cl.primerplayer.ventas.application.port.out.PedidoRepositorio;
 import cl.primerplayer.ventas.domain.Pedido;
+import cl.primerplayer.ventas.events.PedidoListoRetiro;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -33,6 +35,7 @@ class PedidosService implements ConsultarPedidosUseCase, GestionarPedidosUseCase
     private final ConsultarUsuarioUseCase usuarios;
     private final ConsultarPagosUseCase pagos;
     private final Clock clock;
+    private final ApplicationEventPublisher eventos;
 
     // ---------- lecturas ----------
 
@@ -75,7 +78,7 @@ class PedidosService implements ConsultarPedidosUseCase, GestionarPedidosUseCase
 
     @Override
     @Transactional
-    public PedidoVista marcarRetiro(String codigo, EstadoPedido nuevo) {
+    public PedidoVista marcarRetiro(String codigo, EstadoPedido nuevo, boolean notificarCliente) {
         if (!Pedido.ESTADOS_DE_RETIRO.contains(nuevo)) {
             throw new ValidacionException("estado", "Use LISTO_RETIRO o ENTREGADO.");
         }
@@ -83,6 +86,11 @@ class PedidosService implements ConsultarPedidosUseCase, GestionarPedidosUseCase
         actual.validarRetiro(nuevo);
         if (!pedidos.cambiarEstado(actual.id(), actual.estado(), nuevo, clock.instant())) {
             throw new EstadoPedidoInvalidoException("El pedido cambió de estado mientras tanto; recarga e intenta de nuevo.");
+        }
+        if (notificarCliente && nuevo == EstadoPedido.LISTO_RETIRO) {
+            eventos.publishEvent(new PedidoListoRetiro(actual.id(), actual.codigo(), actual.clienteId(),
+                    actual.items().stream().map(i -> new PedidoListoRetiro.Item(
+                            i.tipo(), i.nombre(), i.cantidad())).toList()));
         }
         return aVista(pedidos.porCodigo(codigo).orElseThrow());
     }
@@ -112,6 +120,8 @@ class PedidosService implements ConsultarPedidosUseCase, GestionarPedidosUseCase
         UsuarioResumen vendedor = p.vendedorId() == null ? null : personas.get(p.vendedorId());
         return new PedidoVista(p.id(), p.codigo(), p.canal(), p.estado(), p.total(), p.clienteId(),
                 cliente == null ? null : cliente.email(), cliente == null ? null : cliente.nombre(),
+                p.canal() == cl.primerplayer.ventas.api.CanalPedido.TIENDA || cliente == null ? null : cliente.telefono(),
+                p.canal() == cl.primerplayer.ventas.api.CanalPedido.TIENDA || cliente == null ? null : cliente.rut(),
                 p.vendedorId(), vendedor == null ? null : vendedor.nombre(),
                 p.creadoEn(), p.pagadoEn(), p.actualizadoEn(),
                 p.items().stream().map(i -> new PedidoVista.Item(i.tipo(), i.itemId(), i.nombre(), i.cantidad(),
