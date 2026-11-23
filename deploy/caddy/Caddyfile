@@ -15,8 +15,9 @@
 # Capa extra para las herramientas internas: usuario/clave de Caddy ANTES del login propio de cada una.
 # Al reenviar:
 #  - se quita Authorization: Jenkins, SonarQube y Grafana lo interpretarían como su propio login (401);
-#  - un 401 de la herramienta (p. ej. clave mal escrita en su login) se entrega como 403: con 401 el navegador cree
-#    que falló la clave de Caddy, la olvida y vuelve a mostrar la ventana de usuario/clave.
+#  - se quita WWW-Authenticate de las respuestas de la herramienta: con ese encabezado, un 401 de su propio login
+#    (clave mal escrita) hace que el navegador crea que falló la clave de Caddy, la olvide y vuelva a pedirla.
+#    El 401 se mantiene: SonarQube y Grafana lo usan para llevar a su pantalla de login.
 (herramienta) {
 	import seguridad
 	basic_auth {
@@ -26,10 +27,7 @@
 
 (proxy_herramienta) {
 	header_up -Authorization
-	@rechazo status 401
-	handle_response @rechazo {
-		copy_response 403
-	}
+	header_down -WWW-Authenticate
 }
 
 # ---------- tienda ----------
