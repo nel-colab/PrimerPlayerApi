@@ -1,0 +1,191 @@
+{
+ "uid": "runagard-logs",
+ "title": "Runagard · Logs",
+ "description": "Logs de todos los contenedores (Loki). Filtra por servicio y por texto.",
+ "tags": [
+  "runagard"
+ ],
+ "timezone": "America/Santiago",
+ "refresh": "30s",
+ "schemaVersion": 39,
+ "version": 1,
+ "editable": true,
+ "graphTooltip": 1,
+ "time": {
+  "from": "now-1h",
+  "to": "now"
+ },
+ "templating": {
+  "list": [
+   {
+    "name": "servicio",
+    "label": "Servicio",
+    "type": "query",
+    "datasource": {
+     "type": "loki",
+     "uid": "loki"
+    },
+    "query": {
+     "label": "servicio",
+     "refId": "LokiVariableQueryEditor-VariableQuery",
+     "stream": "",
+     "type": 1
+    },
+    "definition": "label_values(servicio)",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".+",
+    "current": {
+     "selected": true,
+     "text": [
+      "All"
+     ],
+     "value": [
+      "$__all"
+     ]
+    },
+    "refresh": 2,
+    "sort": 1
+   },
+   {
+    "name": "buscar",
+    "label": "Contiene",
+    "type": "textbox",
+    "query": "",
+    "current": {
+     "text": "",
+     "value": ""
+    }
+   }
+  ]
+ },
+ "panels": [
+  {
+   "id": 146,
+   "type": "timeseries",
+   "title": "Líneas de log por servicio",
+   "description": "",
+   "datasource": {
+    "type": "loki",
+    "uid": "loki"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "loki",
+      "uid": "loki"
+     },
+     "expr": "sum by (servicio) (count_over_time({servicio=~\"$servicio\"} |~ \"(?i)$buscar\" [$__auto]))",
+     "legendFormat": "{{servicio}}",
+     "refId": "P"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 70,
+      "stacking": {
+       "mode": "normal"
+      },
+      "lineWidth": 0
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "id": 148,
+   "type": "logs",
+   "title": "Logs",
+   "description": "",
+   "datasource": {
+    "type": "loki",
+    "uid": "loki"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 7,
+    "w": 24,
+    "h": 22
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "loki",
+      "uid": "loki"
+     },
+     "expr": "{servicio=~\"$servicio\"} |~ \"(?i)$buscar\"",
+     "legendFormat": "",
+     "refId": "R"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "showTime": true,
+    "wrapLogMessage": true,
+    "sortOrder": "Descending",
+    "enableLogDetails": true,
+    "dedupStrategy": "none"
+   }
+  }
+ ],
+ "links": [
+  {
+   "title": "Runagard",
+   "type": "dashboards",
+   "tags": [
+    "runagard"
+   ],
+   "asDropdown": true,
+   "includeVars": false,
+   "keepTime": true
+  }
+ ]
+}

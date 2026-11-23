@@ -1,0 +1,14 @@
+# Paneles de Runagard: Grafana los carga al arrancar desde provisioning/dashboards/runagard/*.json
+# (generados con deploy/grafana/generar_paneles.py). Se pueden editar en la interfaz, pero el cambio se pierde al
+# reiniciar: para que dure, edita el script, vuelve a generarlos y haz commit.
+apiVersion: 1
+
+providers:
+  - name: runagard
+    folder: Runagard
+    type: file
+    disableDeletion: true
+    allowUiUpdates: true
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/grafana/provisioning/dashboards/runagard

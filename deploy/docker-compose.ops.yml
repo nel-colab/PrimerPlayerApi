@@ -104,6 +104,7 @@ services:
       GF_SERVER_ROOT_URL: https://grafana.${DOMINIO}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/runagard/01-resumen.json
       # Alertas por correo (mismo SMTP que la tienda)
       GF_SMTP_ENABLED: "true"
       GF_SMTP_HOST: ${SPRING_MAIL_HOST}:${SPRING_MAIL_PORT:-587}
