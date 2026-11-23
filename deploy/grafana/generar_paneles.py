@@ -259,8 +259,9 @@ def postgres():
     db = 'datname="runagard"'
     p = [fila("PostgreSQL de la tienda", 0)]
     p.append(stat("Estado", 0, 1, 4, 4, [t("max(pg_up)", instant=True)], mappings=ESTADO, color="background"))
-    p.append(stat("En marcha desde", 4, 1, 5, 4, [t("max(pg_postmaster_start_time_seconds) * 1000", instant=True)],
-                  "dateTimeFromNow", color="none"))
+    p.append(stat("En marcha desde", 4, 1, 5, 4,
+                  [t('max(container_start_time_seconds{name="runagard-postgres-1"}) * 1000', instant=True)],
+                  "dateTimeFromNow", color="none", descripcion="Último inicio del contenedor de PostgreSQL."))
     p.append(stat("Tamaño", 9, 1, 5, 4, [t(f"pg_database_size_bytes{{{db}}}", instant=True)], "bytes", color="none"))
     p.append(stat("Aciertos de caché", 14, 1, 5, 4,
                   [t(f"100 * sum(rate(pg_stat_database_blks_hit{{{db}}}[30m])) / clamp_min(sum(rate(pg_stat_database_blks_hit{{{db}}}[30m])) + sum(rate(pg_stat_database_blks_read{{{db}}}[30m])), 1e-9)",

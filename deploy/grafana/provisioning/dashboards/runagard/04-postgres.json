@@ -111,7 +111,7 @@
    "id": 94,
    "type": "stat",
    "title": "En marcha desde",
-   "description": "",
+   "description": "Último inicio del contenedor de PostgreSQL.",
    "datasource": {
     "type": "prometheus",
     "uid": "prometheus"
@@ -128,7 +128,7 @@
       "type": "prometheus",
       "uid": "prometheus"
      },
-     "expr": "max(pg_postmaster_start_time_seconds) * 1000",
+     "expr": "max(container_start_time_seconds{name=\"runagard-postgres-1\"}) * 1000",
      "legendFormat": "",
      "refId": "P",
      "instant": true,
