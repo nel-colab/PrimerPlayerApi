@@ -1,0 +1,8 @@
+# Otros dominios de la marca: redirigen al principal, cada uno con su certificado.
+# Activar SOLO cuando sus registros A (@ y www) apunten al VPS; si no, Caddy reintenta los certificados sin parar.
+#   mv sitios/redirecciones.caddy.ejemplo sitios/redirecciones.caddy
+#   docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+
+runagard.store, www.runagard.store, runagard.online, www.runagard.online {
+	redir https://{$DOMINIO}{uri} permanent
+}

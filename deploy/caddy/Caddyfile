@@ -53,6 +53,10 @@ www.{$DOMINIO} {
 	redir https://{$DOMINIO}{uri} permanent
 }
 
+# Sitios opcionales (p. ej. redirecciones desde runagard.store / runagard.online): cada archivo *.caddy de sitios/.
+# Para activarlas: renombrar sitios/redirecciones.caddy.ejemplo a redirecciones.caddy cuando su DNS apunte al VPS.
+import sitios/*.caddy
+
 # Imágenes públicas y comprobantes con URL firmada. Solo lectura: la API escribe por la red interna.
 media.{$DOMINIO} {
 	import seguridad

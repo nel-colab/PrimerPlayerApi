@@ -1,2 +1,6 @@
-/mvnw text eol=lf
-*.cmd text eol=crlf
+# Scripts y configuración que se ejecutan en Linux: siempre LF (con CRLF, bash y Caddy fallan)
+*.sh text eol=lf
+mvnw text eol=lf
+Dockerfile text eol=lf
+Jenkinsfile text eol=lf
+deploy/** text eol=lf

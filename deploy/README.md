@@ -40,13 +40,16 @@ Zona DNS de `runagard.cl` → registros **A** apuntando a la IP del VPS:
 | `sonar` | A | IP del VPS |
 | `grafana` | A | IP del VPS |
 
+Opcional, `runagard.store` y `runagard.online` → redirigen a `runagard.cl`: registros **A** `@` y `www` → IP del VPS,
+y luego activar `caddy/sitios/redirecciones.caddy.ejemplo` (instrucciones dentro del archivo).
+
 Borra registros A/CNAME antiguos de esos nombres (no toques los MX). Comprueba desde tu PC: `nslookup jenkins.runagard.cl`.
 
 ## 2. Servidor seguro
 
 Si aún no lo hiciste: llave SSH, usuario `deploy` con sudo, sin login de root ni contraseñas por SSH, `ufw` con
-OpenSSH/80/443, `fail2ban`, actualizaciones automáticas, Docker y 2 GB de swap (guía en la conversación de
-despliegue, "Fase 2"). Comprueba que `deploy` tenga uid 1000: `id -u deploy`.
+OpenSSH/80/443, `fail2ban`, actualizaciones automáticas, Docker y swap. Jenkins escribe como uid 1000; si tu usuario
+es otro (en Contabo, `ubuntu` ya tiene el 1000), el script del paso 3 los une por grupo.
 
 ## 3. Traer la configuración al VPS
 
@@ -56,10 +59,12 @@ Como `deploy`:
 git clone https://github.com/nel-colab/PrimerPlayerApi.git ~/PrimerPlayerApi
 # usuario de GitHub + el token como contraseña (paso 7); no queda guardado
 
-sudo bash ~/PrimerPlayerApi/deploy/scripts/preparar-servidor.sh     # sysctl de SonarQube y /opt/runagard
+sudo bash ~/PrimerPlayerApi/deploy/scripts/preparar-servidor.sh "$USER"   # sysctl de SonarQube y /opt/runagard
+exit    # vuelve a entrar por SSH (toma el grupo nuevo)
+
 cp -r ~/PrimerPlayerApi/deploy/. /opt/runagard/deploy/
 cd /opt/runagard/deploy
-cp .env.example .env && chmod 600 .env
+cp .env.example .env && chmod 660 .env     # tú y Jenkins (grupo compartido); nadie más
 ```
 
 Desde aquí, el pipeline de la API mantiene `/opt/runagard/deploy` sincronizado con el repo (sin tocar `.env`).
