@@ -1,15 +1,13 @@
 package cl.primerplayer.identidad.events;
 
+import java.util.UUID;
+
 /**
  * Publicado al registrarse un cliente. {@code notificaciones} lo escucha para enviar el correo de verificación.
+ * <p>No lleva el token: el evento queda guardado en el outbox ({@code event_publication}) hasta enviarse, y un token
+ * en claro ahí (o en un respaldo de la base) serviría para verificar la cuenta. Notificaciones lo pide a
+ * {@link cl.primerplayer.identidad.api.EnlacesCuentaUseCase} justo antes de enviar.
  *
- * <p>TODO(pregunta-abierta): el token de verificación viaja en claro en el evento (y quedará en la tabla
- * {@code event_publication} del outbox cuando exista un listener). Alternativa: que notificaciones pida el
- * token a identidad. Además falta la migración de {@code event_publication} antes de crear el primer listener.
+ * @param solicitudId identifica esta solicitud: el correo se envía una sola vez aunque el outbox reintente
  */
-public record UsuarioRegistrado(long usuarioId, String email, String nombre, String tokenVerificacion) {
-    @Override
-    public String toString() {
-        return "UsuarioRegistrado[usuarioId=" + usuarioId + "]";
-    }
-}
+public record UsuarioRegistrado(long usuarioId, String email, String nombre, UUID solicitudId) {}

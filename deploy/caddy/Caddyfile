@@ -1,0 +1,96 @@
+# Caddy: HTTPS automático con Let's Encrypt para todos los sitios.
+# Las variables {$...} vienen de deploy/.env (ver docker-compose.yml).
+# Recargar tras un cambio: docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+
+{
+	email {$ACME_EMAIL}
+}
+
+(seguridad) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+}
+
+# Capa extra para las herramientas internas: usuario/clave de Caddy ANTES del login propio de cada una.
+# Se quita el encabezado Authorization al reenviar: Jenkins, SonarQube y Grafana lo interpretarían como su propio
+# login y responderían 401.
+(herramienta) {
+	import seguridad
+	basic_auth {
+		{$OPS_USUARIO} {$OPS_PASSWORD_HASH}
+	}
+}
+
+# ---------- tienda ----------
+
+{$DOMINIO} {
+	import seguridad
+	encode zstd gzip
+
+	# Estado para el monitoreo externo (UptimeRobot): solo UP/DOWN, sin detalles.
+	handle /salud {
+		rewrite * /actuator/health/readiness
+		reverse_proxy api:8081
+	}
+
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy front:4000
+	}
+
+	log
+}
+
+www.{$DOMINIO} {
+	redir https://{$DOMINIO}{uri} permanent
+}
+
+# Imágenes públicas y comprobantes con URL firmada. Solo lectura: la API escribe por la red interna.
+media.{$DOMINIO} {
+	import seguridad
+	@lectura method GET HEAD
+	handle @lectura {
+		reverse_proxy minio:9000
+	}
+	handle {
+		respond "Método no permitido" 405
+	}
+}
+
+# ---------- herramientas ----------
+
+jenkins.{$DOMINIO} {
+	# El webhook de GitHub no puede pasar el basic_auth; Jenkins valida su firma (GITHUB_WEBHOOK_SECRET).
+	@webhook path /github-webhook /github-webhook/
+	handle @webhook {
+		reverse_proxy jenkins:8080
+	}
+	handle {
+		import herramienta
+		reverse_proxy jenkins:8080 {
+			header_up -Authorization
+		}
+	}
+}
+
+sonar.{$DOMINIO} {
+	import herramienta
+	reverse_proxy sonarqube:9000 {
+		header_up -Authorization
+	}
+}
+
+grafana.{$DOMINIO} {
+	import herramienta
+	reverse_proxy grafana:3000 {
+		header_up -Authorization
+	}
+}

@@ -140,6 +140,17 @@ final class Fakes {
     static final class TokensUnUsoEnMemoria implements TokenUnUsoRepositorio {
         final List<TokenUnUso> guardados = new ArrayList<>();
         @Override public void guardar(TokenUnUso token) { guardados.add(token); }
+        @Override public int invalidarPendientes(long usuarioId, TokenUnUso.Tipo tipo, java.time.Instant ahora) {
+            int n = 0;
+            for (int i = 0; i < guardados.size(); i++) {
+                TokenUnUso t = guardados.get(i);
+                if (t.usuarioId() == usuarioId && t.tipo() == tipo && t.expiraEn().isAfter(ahora)) {
+                    guardados.set(i, new TokenUnUso(t.id(), t.usuarioId(), t.tipo(), t.tokenHash(), ahora));
+                    n++;
+                }
+            }
+            return n;
+        }
     }
 
     /** "Hash" reversible solo para pruebas. */

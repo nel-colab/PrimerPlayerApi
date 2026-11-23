@@ -1,0 +1,123 @@
+# Stack de la tienda en producción: Caddy (HTTPS) + frontend + API + PostgreSQL + MinIO.
+# Se ejecuta en el VPS desde /opt/runagard/deploy (las variables salen de deploy/.env, que nunca va a git).
+#
+#   docker compose up -d caddy postgres minio     # primera vez (la API y el front los despliega Jenkins)
+#   docker compose ps
+#
+# Solo Caddy publica puertos. PostgreSQL vive en una red interna sin salida a internet.
+
+name: runagard
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"          # HTTP/3
+    environment:
+      DOMINIO: ${DOMINIO}
+      ACME_EMAIL: ${ACME_EMAIL}
+      OPS_USUARIO: ${OPS_USUARIO}
+      OPS_PASSWORD_HASH: ${OPS_PASSWORD_HASH}
+    volumes:
+      - ./caddy:/etc/caddy:ro  # carpeta (no archivo): así un "caddy reload" ve el Caddyfile actualizado
+      - caddy_data:/data       # certificados de Let's Encrypt
+      - caddy_config:/config
+    networks: [edge]
+    mem_limit: 128m
+
+  front:
+    image: runagard/front:${FRONT_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: "4000"
+      NG_ALLOWED_HOSTS: ${DOMINIO},www.${DOMINIO}
+    networks: [edge]
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    image: runagard/api:${API_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      PP_MAIL_REMITENTE: ${PP_MAIL_REMITENTE}
+      PP_URL_FRONT: https://${DOMINIO}
+      PP_AUTH_JWT_SECRETO: ${PP_AUTH_JWT_SECRETO}
+      PP_AUTH_GOOGLE_CLIENT_ID: ${PP_AUTH_GOOGLE_CLIENT_ID}
+      PP_MEDIA_ENDPOINT: http://minio:9000
+      PP_MEDIA_ACCESS_KEY: ${MINIO_ROOT_USER}
+      PP_MEDIA_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      PP_MEDIA_URL_PUBLICA: https://media.${DOMINIO}
+      PP_CHECKOUT_URL_RETORNO: https://${DOMINIO}/api/v1/pagos/webpay/retorno
+      PP_CHECKOUT_URL_RESULTADO: https://${DOMINIO}/pago/resultado
+      PP_WEBPAY_AMBIENTE: ${PP_WEBPAY_AMBIENTE:-integracion}
+      PP_WEBPAY_CODIGO_COMERCIO: ${PP_WEBPAY_CODIGO_COMERCIO:-}
+      PP_WEBPAY_API_KEY: ${PP_WEBPAY_API_KEY:-}
+      PP_WEBPAY_URL_FORMULARIO: ${PP_WEBPAY_URL_FORMULARIO:-https://webpay3gint.transbank.cl/webpayserver/initTransaction}
+    networks: [edge, datos]
+    mem_limit: 1280m
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: UTC
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [datos]
+    shm_size: 256m
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  minio:
+    # Las imágenes oficiales minio/minio ya no se publican (sep. 2026): se usa la de Chainguard.
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    user: "0:0"                # el volumen nombrado se crea como root
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    networks: [edge]           # Caddy publica solo lectura (GET/HEAD) en media.<dominio>
+    mem_limit: 512m
+
+networks:
+  edge:
+    name: runagard-edge        # la comparten Caddy, la tienda y las herramientas (docker-compose.ops.yml)
+  datos:
+    name: runagard-datos
+    internal: true             # sin salida a internet: solo API y postgres-exporter llegan a PostgreSQL
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pgdata:
+  miniodata:

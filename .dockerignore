@@ -1,0 +1,12 @@
+target/
+.git/
+.idea/
+.vscode/
+.claude/
+docs/
+deploy/
+docker/
+scripts/
+*.md
+.env
+**/.env

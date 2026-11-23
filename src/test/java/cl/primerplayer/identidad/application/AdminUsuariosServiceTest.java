@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -22,7 +21,6 @@ import cl.primerplayer.identidad.api.AdminUsuariosUseCase.UsuarioAdmin;
 import cl.primerplayer.identidad.api.UltimoAdminException;
 import cl.primerplayer.identidad.application.port.out.AdminUsuariosRepositorio;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio;
-import cl.primerplayer.identidad.application.port.out.TokenUnUsoRepositorio;
 import cl.primerplayer.shared.api.Rol;
 
 /** El último administrador activo no se puede degradar ni banear (la carrera entre dos admins la cierra el advisory lock). */
@@ -36,10 +34,8 @@ class AdminUsuariosServiceTest {
     @BeforeEach
     void setUp() {
         repo = mock(AdminUsuariosRepositorio.class);
-        IdentidadProperties props = mock(IdentidadProperties.class);
-        when(props.verificacionTtl()).thenReturn(Duration.ofDays(1));
-        servicio = new AdminUsuariosService(repo, mock(CuentaRepositorio.class), mock(TokenUnUsoRepositorio.class),
-                mock(ApplicationEventPublisher.class), Clock.fixed(AHORA, ZoneOffset.UTC), props, Duration.ofHours(1));
+        servicio = new AdminUsuariosService(repo, mock(CuentaRepositorio.class), mock(ApplicationEventPublisher.class),
+                Clock.fixed(AHORA, ZoneOffset.UTC));
         when(repo.bloquear(anyLong(), any())).thenReturn(Optional.of(new UsuarioAdmin(2, "b@x.cl", "B", Rol.ADMIN, null,
                 true, null, null, false, AHORA, null)));
         when(repo.adminsActivos(any())).thenReturn(1L);

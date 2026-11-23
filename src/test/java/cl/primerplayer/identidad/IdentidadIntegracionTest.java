@@ -1,6 +1,7 @@
 package cl.primerplayer.identidad;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -79,10 +81,17 @@ class IdentidadIntegracionTest {
 
         String hash = jdbc.queryForObject("SELECT password_hash FROM usuario WHERE email = ?", String.class, email);
         assertThat(hash).startsWith("$2").doesNotContain(PASSWORD);
-        Integer verificaciones = jdbc.queryForObject("""
+        // notificaciones emite el enlace al enviar el correo (después del commit, en otro hilo)
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM token_un_uso t JOIN usuario u ON u.id = t.usuario_id
-                WHERE u.email = ? AND t.tipo = 'VERIFICACION' AND t.usado_en IS NULL""", Integer.class, email);
-        assertThat(verificaciones).isEqualTo(1);
+                WHERE u.email = ? AND t.tipo = 'VERIFICACION' AND t.usado_en IS NULL""", Integer.class, email))
+                .isEqualTo(1));
+        // el outbox guarda el evento sin token: solo usuarioId, email, nombre y solicitudId
+        assertThat(jdbc.queryForList("""
+                SELECT serialized_event FROM event_publication
+                WHERE event_type = 'cl.primerplayer.identidad.events.UsuarioRegistrado' AND serialized_event LIKE ?""",
+                String.class, "%" + email + "%"))
+                .allSatisfy(json -> assertThat(json).doesNotContainIgnoringCase("token"));
     }
 
     @Test

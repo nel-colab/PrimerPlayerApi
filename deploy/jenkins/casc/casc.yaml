@@ -1,0 +1,85 @@
+# Configuración de Jenkins como código (plugin configuration-as-code). Se aplica en cada arranque:
+# cambiar algo aquí + docker compose -f docker-compose.ops.yml restart jenkins.
+# Las ${VARIABLES} vienen de deploy/.env (ver docker-compose.ops.yml).
+
+jenkins:
+  systemMessage: "CI/CD de Runagard (Primer Player)"
+  numExecutors: 1              # un build a la vez: el VPS es compartido con la tienda
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_USER}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  markupFormatter: plainText
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: github-token
+              description: "GitHub: token de solo lectura para clonar los repositorios"
+              username: "${GITHUB_USER}"
+              password: "${GITHUB_TOKEN}"
+          - string:
+              scope: GLOBAL
+              id: github-webhook-secret
+              description: "GitHub: secreto para validar los webhooks"
+              secret: "${GITHUB_WEBHOOK_SECRET}"
+          - string:
+              scope: GLOBAL
+              id: sonar-token
+              description: "SonarQube: token de análisis"
+              secret: "${SONAR_TOKEN}"
+
+unclassified:
+  location:
+    url: "https://jenkins.${DOMINIO}/"
+  sonarGlobalConfiguration:
+    buildWrapperEnabled: true
+    installations:
+      - name: "sonarqube"
+        serverUrl: "http://sonarqube:9000"
+        credentialsId: "sonar-token"
+  gitHubPluginConfig:
+    hookSecretConfigs:
+      - credentialsId: "github-webhook-secret"
+
+# Un job por repositorio: rama main, Jenkinsfile del repo, se dispara con el webhook de GitHub (push).
+jobs:
+  - script: >
+      def owner = '${GITHUB_OWNER}';
+      [api: 'PrimerPlayerApi', front: 'PrimerPlayerFront'].each { nombre, repo ->
+        pipelineJob('runagard-' + nombre) {
+          description('Pruebas, SonarQube, imagen Docker y despliegue de ' + repo + ' (rama main)')
+          properties {
+            githubProjectUrl('https://github.com/' + owner + '/' + repo)
+            pipelineTriggers {
+              triggers {
+                githubPush()
+              }
+            }
+          }
+          definition {
+            cpsScm {
+              scm {
+                git {
+                  remote {
+                    url('https://github.com/' + owner + '/' + repo + '.git')
+                    credentials('github-token')
+                  }
+                  branch('*/main')
+                }
+              }
+              scriptPath('Jenkinsfile')
+              lightweight(true)
+            }
+          }
+        }
+      }

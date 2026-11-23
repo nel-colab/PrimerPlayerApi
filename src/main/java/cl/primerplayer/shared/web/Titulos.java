@@ -8,6 +8,11 @@ public final class Titulos {
     public static String de(String code) {
         return switch (code) {
             case "validation" -> "Solicitud inválida";
+            case "not-found" -> "Recurso no encontrado";
+            case "method-not-allowed" -> "Método no permitido";
+            case "unsupported-media-type" -> "Tipo de contenido no soportado";
+            case "not-acceptable" -> "Formato no disponible";
+            case "payload-too-large" -> "Archivo demasiado grande";
             case "unauthorized" -> "No autenticado";
             case "forbidden" -> "Acceso denegado";
             case "account-locked" -> "Cuenta bloqueada temporalmente";

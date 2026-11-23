@@ -41,7 +41,10 @@ class SecurityConfig {
                                  "/api/v1/eventos", "/api/v1/eventos/*", "/api/v1/agenda/ocupados",
                                  "/api/v1/auth/google/config").permitAll()
                 .requestMatchers("/api/v1/openapi.json", "/api/v1/openapi.json/**",
-                                 "/swagger-ui.html", "/swagger-ui/**", "/actuator/health").permitAll()
+                                 "/swagger-ui.html", "/swagger-ui/**", "/actuator/health", "/actuator/health/**").permitAll()
+                // Métricas para Prometheus: en producción Actuator escucha en el puerto 8081, que solo existe dentro
+                // de la red de Docker (Caddy publica únicamente /api del 8080). En desarrollo no se expone.
+                .requestMatchers("/actuator/prometheus").permitAll()
                 .requestMatchers("/api/v1/admin/reportes/**", "/api/v1/admin/usuarios", "/api/v1/admin/usuarios/**",
                                  "/api/v1/admin/auditoria", "/api/v1/admin/auditoria/**",
                                  "/api/v1/admin/productos/exportar", "/api/v1/admin/productos/importar")

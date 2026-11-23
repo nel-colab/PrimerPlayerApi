@@ -18,6 +18,10 @@
 - **Perfil completo del personal**: VENDEDOR/ADMIN sin nombre, teléfono o RUT reciben 403 `profile-incomplete` en
   `/admin/**` (se revisa en la base en cada request). Lo completan en `PUT /me/perfil`; `GET /me` expone
   `profileComplete`. Comprar no exige perfil completo.
+- **Enlaces de un solo uso** (verificar correo, restablecer contraseña): en la base solo se guarda el SHA-256. Los
+  eventos (`UsuarioRegistrado`, `VerificacionSolicitada`, `RecuperacionSolicitada`) **no llevan el token**, porque
+  quedan en el outbox: notificaciones lo pide a `EnlacesCuentaUseCase` justo antes de enviar el correo. Cada correo
+  nuevo invalida los enlaces anteriores del mismo tipo: solo sirve el último.
 
 ## Stock
 

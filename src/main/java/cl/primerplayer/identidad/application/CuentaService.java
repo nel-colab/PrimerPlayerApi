@@ -2,10 +2,9 @@ package cl.primerplayer.identidad.application;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +15,6 @@ import cl.primerplayer.identidad.api.YaVerificadoException;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio.FilaCuenta;
 import cl.primerplayer.identidad.application.port.out.HasherPassword;
-import cl.primerplayer.identidad.application.port.out.TokenUnUsoRepositorio;
 import cl.primerplayer.identidad.application.port.out.UsuarioRepositorio;
 import cl.primerplayer.identidad.domain.TokenOpaco;
 import cl.primerplayer.identidad.domain.TokenUnUso;
@@ -34,24 +32,17 @@ class CuentaService implements CuentaUseCase {
 
     private final CuentaRepositorio cuentas;
     private final UsuarioRepositorio usuarios;
-    private final TokenUnUsoRepositorio tokens;
     private final HasherPassword hasher;
     private final ApplicationEventPublisher eventos;
     private final Clock clock;
-    private final Duration verificacionTtl;
-    private final Duration recuperacionTtl;
 
-    CuentaService(CuentaRepositorio cuentas, UsuarioRepositorio usuarios, TokenUnUsoRepositorio tokens,
-                  HasherPassword hasher, ApplicationEventPublisher eventos, Clock clock, IdentidadProperties props,
-                  @Value("${pp.auth.recuperacion-ttl:1h}") Duration recuperacionTtl) {
+    CuentaService(CuentaRepositorio cuentas, UsuarioRepositorio usuarios, HasherPassword hasher,
+                  ApplicationEventPublisher eventos, Clock clock) {
         this.cuentas = cuentas;
         this.usuarios = usuarios;
-        this.tokens = tokens;
         this.hasher = hasher;
         this.eventos = eventos;
         this.clock = clock;
-        this.verificacionTtl = props.verificacionTtl();
-        this.recuperacionTtl = recuperacionTtl;
     }
 
     // ---------- perfil ----------
@@ -97,10 +88,8 @@ class CuentaService implements CuentaUseCase {
         }
         // Siempre "acepta": no revela si el correo existe. Solo cuentas que pueden iniciar sesión reciben el enlace.
         usuarios.buscarPorEmail(Usuario.normalizarEmail(email)).filter(Usuario::puedeIniciarSesion).ifPresent(u -> {
-            Instant ahora = clock.instant();
-            TokenOpaco token = TokenOpaco.generar();
-            tokens.guardar(TokenUnUso.recuperacion(u.id(), token, ahora, recuperacionTtl));
-            eventos.publishEvent(new RecuperacionSolicitada(u.id(), u.email(), u.nombre(), token.valor()));
+            // el enlace se emite al enviar el correo (EnlacesCuentaUseCase): el outbox no guarda el token
+            eventos.publishEvent(new RecuperacionSolicitada(u.id(), u.email(), u.nombre(), UUID.randomUUID()));
         });
     }
 
@@ -131,9 +120,7 @@ class CuentaService implements CuentaUseCase {
         if (c.emailVerificadoEn() != null) {
             throw new YaVerificadoException();
         }
-        TokenOpaco token = TokenOpaco.generar();
-        tokens.guardar(TokenUnUso.verificacion(usuarioId, token, clock.instant(), verificacionTtl));
-        eventos.publishEvent(new VerificacionSolicitada(usuarioId, c.email(), c.nombre(), token.valor()));
+        eventos.publishEvent(new VerificacionSolicitada(usuarioId, c.email(), c.nombre(), UUID.randomUUID()));
     }
 
     // ---------- reglas ----------

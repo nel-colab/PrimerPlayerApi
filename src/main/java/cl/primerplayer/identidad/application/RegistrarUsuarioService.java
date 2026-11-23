@@ -3,6 +3,7 @@ package cl.primerplayer.identidad.application;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -12,10 +13,7 @@ import cl.primerplayer.identidad.api.EmailEnUsoException;
 import cl.primerplayer.identidad.api.RegistrarUsuarioUseCase;
 import cl.primerplayer.identidad.api.UsuarioResumen;
 import cl.primerplayer.identidad.application.port.out.HasherPassword;
-import cl.primerplayer.identidad.application.port.out.TokenUnUsoRepositorio;
 import cl.primerplayer.identidad.application.port.out.UsuarioRepositorio;
-import cl.primerplayer.identidad.domain.TokenOpaco;
-import cl.primerplayer.identidad.domain.TokenUnUso;
 import cl.primerplayer.identidad.domain.Usuario;
 import cl.primerplayer.identidad.events.UsuarioRegistrado;
 import cl.primerplayer.shared.api.ValidacionException;
@@ -29,10 +27,8 @@ class RegistrarUsuarioService implements RegistrarUsuarioUseCase {
     static final int MAX_BYTES_PASSWORD = 72;
 
     private final UsuarioRepositorio usuarios;
-    private final TokenUnUsoRepositorio tokens;
     private final HasherPassword hasher;
     private final ApplicationEventPublisher eventos;
-    private final IdentidadProperties props;
     private final Clock clock;
 
     @Override
@@ -52,12 +48,9 @@ class RegistrarUsuarioService implements RegistrarUsuarioUseCase {
         Usuario usuario = usuarios.guardarNuevo(
                 Usuario.registrarCliente(cmd.nombre(), email, hasher.hashear(cmd.password()), ahora));
 
-        TokenOpaco verificacion = TokenOpaco.generar();
-        tokens.guardar(TokenUnUso.verificacion(usuario.id(), verificacion, ahora, props.verificacionTtl()));
-
-        // notificaciones lo escucha después del commit (outbox de Spring Modulith) y envía el correo.
-        eventos.publishEvent(new UsuarioRegistrado(usuario.id(), usuario.email(), usuario.nombre(),
-                verificacion.valor()));
+        // notificaciones lo escucha después del commit (outbox de Spring Modulith), pide el enlace a
+        // EnlacesCuentaUseCase y envía el correo: el token nunca queda en el outbox.
+        eventos.publishEvent(new UsuarioRegistrado(usuario.id(), usuario.email(), usuario.nombre(), UUID.randomUUID()));
 
         return UsuarioResumenes.de(usuario);
     }

@@ -467,6 +467,10 @@ o `year`. Ambos devuelven JSON por defecto y generan XLSX con `format=excel` o e
 `LISTO_RETIRO`; se ignora al marcar `ENTREGADO`. Ambos estados se permiten para pedidos web de productos, eventos o
 mixtos. Las ventas de mostrador no admiten esta transición.
 
+### Despliegue en producción
+
+Guía paso a paso (DNS, servidor, Jenkins, SonarQube, Grafana, respaldos): [`deploy/README.md`](deploy/README.md).
+
 ### Prompts para el frontend
 
 Instrucciones listas para entregar al agente que trabaja en `PrimerPlayerFront`:

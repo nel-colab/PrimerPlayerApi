@@ -1,9 +1,11 @@
 package cl.primerplayer.identidad.events;
 
-/** El usuario (o un administrador) pidió reenviar el correo de verificación. Lo escucha notificaciones. */
-public record VerificacionSolicitada(long usuarioId, String email, String nombre, String tokenVerificacion) {
-    @Override
-    public String toString() {
-        return "VerificacionSolicitada[usuarioId=" + usuarioId + "]";   // nunca el token en los logs
-    }
-}
+import java.util.UUID;
+
+/**
+ * El usuario (o un administrador) pidió reenviar el correo de verificación. Lo escucha notificaciones.
+ * Sin token, igual que {@link UsuarioRegistrado}.
+ *
+ * @param solicitudId identifica esta solicitud: el correo se envía una sola vez aunque el outbox reintente
+ */
+public record VerificacionSolicitada(long usuarioId, String email, String nombre, UUID solicitudId) {}

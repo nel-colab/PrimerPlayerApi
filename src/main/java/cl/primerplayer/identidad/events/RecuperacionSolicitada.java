@@ -1,12 +1,11 @@
 package cl.primerplayer.identidad.events;
 
+import java.util.UUID;
+
 /**
  * Se pidió restablecer la contraseña (el propio usuario o un administrador). Lo escucha notificaciones para enviar el
- * enlace. El token viaja en el evento y el outbox lo borra al completarse ({@code completion-mode: delete}).
+ * enlace. Sin token, igual que {@link UsuarioRegistrado}: el enlace se emite al enviar el correo.
+ *
+ * @param solicitudId identifica esta solicitud: el correo se envía una sola vez aunque el outbox reintente
  */
-public record RecuperacionSolicitada(long usuarioId, String email, String nombre, String tokenRecuperacion) {
-    @Override
-    public String toString() {
-        return "RecuperacionSolicitada[usuarioId=" + usuarioId + "]";
-    }
-}
+public record RecuperacionSolicitada(long usuarioId, String email, String nombre, UUID solicitudId) {}

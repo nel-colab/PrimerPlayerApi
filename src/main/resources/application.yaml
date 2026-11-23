@@ -60,7 +60,7 @@ pp:
     google:
       # ID de cliente OAuth (aplicación web) de Google Cloud Console; el mismo que usa el frontend.
       # Vacío = "Continuar con Google" deshabilitado (503 google-unavailable).
-      client-id: 787872539302-5lkjcuse2s9adeu38ocjl25h89o163is.apps.googleusercontent.com
+      client-id: ${PP_AUTH_GOOGLE_CLIENT_ID:787872539302-5lkjcuse2s9adeu38ocjl25h89o163is.apps.googleusercontent.com}
     bloqueo:
       max-intentos: 5
       duracion: 15m

@@ -1,0 +1,33 @@
+# Qué mide Prometheus (cada 30 s). Recargar tras un cambio:
+#   docker compose -f docker-compose.ops.yml restart prometheus
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: vps                       # node-exporter: CPU, RAM, disco y red del servidor
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: contenedores              # cAdvisor: consumo por contenedor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  - job_name: api                       # Spring Boot Actuator (puerto interno 8081)
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["api:8081"]
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: jenkins
+    metrics_path: /prometheus/
+    static_configs:
+      - targets: ["jenkins:8080"]

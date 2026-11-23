@@ -1,13 +1,12 @@
 package cl.primerplayer.identidad.application;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +17,6 @@ import cl.primerplayer.identidad.api.UltimoAdminException;
 import cl.primerplayer.identidad.api.YaVerificadoException;
 import cl.primerplayer.identidad.application.port.out.AdminUsuariosRepositorio;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio;
-import cl.primerplayer.identidad.application.port.out.TokenUnUsoRepositorio;
-import cl.primerplayer.identidad.domain.TokenOpaco;
-import cl.primerplayer.identidad.domain.TokenUnUso;
 import cl.primerplayer.identidad.events.RecuperacionSolicitada;
 import cl.primerplayer.identidad.events.UsuarioAdministrado;
 import cl.primerplayer.identidad.events.VerificacionSolicitada;
@@ -37,22 +33,15 @@ class AdminUsuariosService implements AdminUsuariosUseCase {
 
     private final AdminUsuariosRepositorio admin;
     private final CuentaRepositorio cuentas;
-    private final TokenUnUsoRepositorio tokens;
     private final ApplicationEventPublisher eventos;
     private final Clock clock;
-    private final Duration verificacionTtl;
-    private final Duration recuperacionTtl;
 
-    AdminUsuariosService(AdminUsuariosRepositorio admin, CuentaRepositorio cuentas, TokenUnUsoRepositorio tokens,
-                         ApplicationEventPublisher eventos, Clock clock, IdentidadProperties props,
-                         @Value("${pp.auth.recuperacion-ttl:1h}") Duration recuperacionTtl) {
+    AdminUsuariosService(AdminUsuariosRepositorio admin, CuentaRepositorio cuentas, ApplicationEventPublisher eventos,
+                         Clock clock) {
         this.admin = admin;
         this.cuentas = cuentas;
-        this.tokens = tokens;
         this.eventos = eventos;
         this.clock = clock;
-        this.verificacionTtl = props.verificacionTtl();
-        this.recuperacionTtl = recuperacionTtl;
     }
 
     // ---------- lecturas ----------
@@ -143,9 +132,7 @@ class AdminUsuariosService implements AdminUsuariosUseCase {
         UsuarioAdmin u = cuenta(usuarioId);
         Instant ahora = clock.instant();
         admin.marcarCambioPassword(usuarioId, ahora);
-        TokenOpaco token = TokenOpaco.generar();
-        tokens.guardar(TokenUnUso.recuperacion(usuarioId, token, ahora, recuperacionTtl));
-        eventos.publishEvent(new RecuperacionSolicitada(usuarioId, u.email(), u.nombre(), token.valor()));
+        eventos.publishEvent(new RecuperacionSolicitada(usuarioId, u.email(), u.nombre(), UUID.randomUUID()));
         return auditar(actorId, u, "CAMBIO_PASSWORD_SOLICITADO", Map.of(), Map.of("cambioPasswordPendiente", "true"));
     }
 
@@ -156,9 +143,7 @@ class AdminUsuariosService implements AdminUsuariosUseCase {
         if (u.emailVerificado()) {
             throw new YaVerificadoException();
         }
-        TokenOpaco token = TokenOpaco.generar();
-        tokens.guardar(TokenUnUso.verificacion(usuarioId, token, clock.instant(), verificacionTtl));
-        eventos.publishEvent(new VerificacionSolicitada(usuarioId, u.email(), u.nombre(), token.valor()));
+        eventos.publishEvent(new VerificacionSolicitada(usuarioId, u.email(), u.nombre(), UUID.randomUUID()));
         return auditar(actorId, u, "VERIFICACION_REENVIADA", Map.of(), Map.of());
     }
 

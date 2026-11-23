@@ -1,0 +1,205 @@
+# Herramientas: CI/CD (Jenkins + SonarQube) y monitoreo (Prometheus + Grafana + Loki + Alloy + exporters).
+# Requiere el stack de la tienda creado antes (redes runagard-edge y runagard-datos):
+#
+#   cd /opt/runagard/deploy
+#   docker compose -f docker-compose.ops.yml up -d --build
+#
+# El VPS tiene 8 GB: cada servicio tiene un tope de memoria. SonarQube es el más pesado (~2 GB).
+
+name: runagard-ops
+
+services:
+  # ---------- CI/CD ----------
+
+  jenkins:
+    build: ./jenkins
+    image: runagard/jenkins:local
+    restart: unless-stopped
+    group_add:
+      - "${DOCKER_GID}"        # acceso al socket de Docker (construir imágenes, desplegar, Testcontainers)
+    environment:
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Xmx768m
+      CASC_JENKINS_CONFIG: /var/jenkins_casc/casc.yaml
+      DOMINIO: ${DOMINIO}
+      JENKINS_ADMIN_USER: ${JENKINS_ADMIN_USER}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD}
+      GITHUB_OWNER: ${GITHUB_OWNER}
+      GITHUB_USER: ${GITHUB_USER}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      SONAR_TOKEN: ${SONAR_TOKEN:-pendiente}
+      # Las pruebas de la API levantan PostgreSQL con Testcontainers como contenedor "hermano":
+      # Jenkins lo alcanza por el gateway del host.
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./jenkins/casc:/var/jenkins_casc:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/runagard:/opt/runagard   # misma ruta dentro y fuera: docker compose resuelve bien los bind mounts
+    networks: [edge]
+    mem_limit: 3g              # incluye Maven y npm durante los builds
+
+  sonarqube:
+    image: sonarqube:26.11.0.134175-community
+    restart: unless-stopped
+    depends_on: [sonar-db]
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD}
+      SONAR_SEARCH_JAVAOPTS: -Xms512m -Xmx512m
+      SONAR_WEB_JAVAOPTS: -Xmx512m
+      SONAR_CE_JAVAOPTS: -Xmx768m
+      # El webhook del quality gate va a http://jenkins:8080 (IP privada de Docker); SonarQube los bloquea por defecto.
+      SONAR_VALIDATEWEBHOOKS: "false"
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+      nproc: 8192
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+    networks: [edge, sonar]
+    mem_limit: 2560m
+
+  sonar-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sonar
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD}
+    volumes:
+      - sonar_db:/var/lib/postgresql/data
+    networks: [sonar]
+    mem_limit: 384m
+
+  # ---------- monitoreo ----------
+
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    networks: [edge, monitoreo]  # edge: métricas de la API y de Jenkins
+    mem_limit: 512m
+
+  grafana:
+    image: grafana/grafana:13.3.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_ROOT_URL: https://grafana.${DOMINIO}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      # Alertas por correo (mismo SMTP que la tienda)
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: ${SPRING_MAIL_HOST}:${SPRING_MAIL_PORT:-587}
+      GF_SMTP_USER: ${SPRING_MAIL_USERNAME}
+      GF_SMTP_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      GF_SMTP_FROM_ADDRESS: ${ALERTAS_REMITENTE}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks: [edge, monitoreo]
+    mem_limit: 256m
+
+  loki:
+    image: grafana/loki:3.6.22
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./loki:/etc/loki:ro
+      - loki_data:/loki
+    networks: [monitoreo]
+    mem_limit: 512m
+
+  alloy:
+    # Recolecta los logs de todos los contenedores y los envía a Loki.
+    image: grafana/alloy:v1.22.0
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+    volumes:
+      - ./alloy:/etc/alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [monitoreo]
+    mem_limit: 256m
+
+  node-exporter:
+    # CPU, memoria, disco y red del VPS.
+    image: prom/node-exporter:v1.13.1
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+    networks: [monitoreo]
+    mem_limit: 64m
+
+  cadvisor:
+    # Consumo de cada contenedor.
+    image: ghcr.io/google/cadvisor:v0.61.1
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks: [monitoreo]
+    mem_limit: 256m
+
+  postgres-exporter:
+    # Conexiones, tamaño y actividad de la base de la tienda.
+    image: prometheuscommunity/postgres-exporter:v0.21.1
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: postgres:5432/${POSTGRES_DB}?sslmode=disable
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+    networks: [datos, monitoreo]
+    mem_limit: 64m
+
+networks:
+  edge:
+    external: true
+    name: runagard-edge
+  datos:
+    external: true
+    name: runagard-datos
+  monitoreo: {}
+  sonar: {}
+
+volumes:
+  jenkins_home:
+  sonar_data:
+  sonar_extensions:
+  sonar_logs:
+  sonar_db:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  alloy_data:

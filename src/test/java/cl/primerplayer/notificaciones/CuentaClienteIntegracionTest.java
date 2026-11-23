@@ -110,6 +110,9 @@ class CuentaClienteIntegracionTest {
 
         con(acceso, post("/api/v1/me/verificacion")).andExpect(status().isAccepted());
         await().atMost(ESPERA).until(() -> correos.para(email).size() == 2);
+        // solo sirve el enlace del último correo
+        json(post("/api/v1/auth/verificacion"), "{\"token\":\"" + correos.token(email, "Bienvenido") + "\"}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-token"));
         json(post("/api/v1/auth/verificacion"), "{\"token\":\"" + correos.token(email, "Verifica") + "\"}")
                 .andExpect(status().isNoContent());
         con(acceso, post("/api/v1/me/verificacion"))

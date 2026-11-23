@@ -48,8 +48,10 @@ class S3Almacen implements AlmacenObjetos, ApplicationRunner {
                 .httpClientBuilder(UrlConnectionHttpClient.builder()
                         .connectionTimeout(Duration.ofSeconds(5)).socketTimeout(Duration.ofSeconds(20)))
                 .build();
+        // Las URL firmadas las abre el navegador: se firman con la base pública (https://media.dominio), no con el
+        // endpoint interno (http://minio:9000). Caddy reenvía el Host original y MinIO valida la firma con él.
         this.presigner = S3Presigner.builder()
-                .endpointOverride(URI.create(props.endpoint()))
+                .endpointOverride(URI.create(props.urlPublica()))
                 .region(Region.of(props.region()))
                 .credentialsProvider(credenciales)
                 .serviceConfiguration(config)

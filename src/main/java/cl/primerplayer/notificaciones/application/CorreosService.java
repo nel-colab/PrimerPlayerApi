@@ -1,12 +1,13 @@
 package cl.primerplayer.notificaciones.application;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
-import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -16,6 +17,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import cl.primerplayer.clientes.events.AlertaStockDisparada;
 import cl.primerplayer.identidad.api.ConsultarUsuarioUseCase;
+import cl.primerplayer.identidad.api.EnlacesCuentaUseCase;
+import cl.primerplayer.identidad.api.EnlacesCuentaUseCase.TokenEmitido;
 import cl.primerplayer.identidad.api.UsuarioResumen;
 import cl.primerplayer.identidad.events.RecuperacionSolicitada;
 import cl.primerplayer.identidad.events.UsuarioRegistrado;
@@ -31,6 +34,8 @@ import lombok.extern.slf4j.Slf4j;
  * Escucha los eventos DESPUÉS del commit, en otro hilo y sin transacción: el SMTP nunca retiene una conexión de base.
  * Spring Modulith guarda cada publicación en el outbox y la reintenta si el envío falla o la app se reinicia.
  * Los logs nunca incluyen tokens (regla 10).
+ * <p>Los enlaces de verificación y recuperación se emiten aquí, después de reservar el envío y justo antes del SMTP
+ * ({@link EnlacesCuentaUseCase}, con su propia transacción corta): los eventos del outbox no llevan tokens.
  */
 @Service
 @Slf4j
@@ -39,14 +44,17 @@ class CorreosService {
     private final EnvioCorreo correo;
     private final CorreoEnviadoRepositorio enviados;
     private final ConsultarUsuarioUseCase usuarios;
+    private final EnlacesCuentaUseCase enlaces;
     private final Clock clock;
     private final String urlFront;
 
-    CorreosService(EnvioCorreo correo, CorreoEnviadoRepositorio enviados, ConsultarUsuarioUseCase usuarios, Clock clock,
+    CorreosService(EnvioCorreo correo, CorreoEnviadoRepositorio enviados, ConsultarUsuarioUseCase usuarios,
+                   EnlacesCuentaUseCase enlaces, Clock clock,
                    @Value("${pp.notificaciones.url-front:http://localhost:4200}") String urlFront) {
         this.correo = correo;
         this.enviados = enviados;
         this.usuarios = usuarios;
+        this.enlaces = enlaces;
         this.clock = clock;
         this.urlFront = urlFront.replaceAll("/+$", "");
     }
@@ -54,30 +62,29 @@ class CorreosService {
     @Async
     @TransactionalEventListener
     void alRegistrarse(UsuarioRegistrado e) {
-        verificacion(e.email(), e.nombre(), e.tokenVerificacion(), "¡Bienvenido a Primer Player!");
+        verificacion(e.usuarioId(), e.email(), e.nombre(), e.solicitudId(), "¡Bienvenido a Primer Player!");
     }
 
     @Async
     @TransactionalEventListener
     void alPedirVerificacion(VerificacionSolicitada e) {
-        verificacion(e.email(), e.nombre(), e.tokenVerificacion(), "Verifica tu correo");
+        verificacion(e.usuarioId(), e.email(), e.nombre(), e.solicitudId(), "Verifica tu correo");
     }
 
     @Async
     @TransactionalEventListener
     void alPedirRecuperacion(RecuperacionSolicitada e) {
-        String enlace = enlace("/cuenta/restablecer", e.tokenRecuperacion());
-        enviarUnaVez(e.email(), "recuperacion-password", "token-" + huella(e.tokenRecuperacion()),
-                "Restablece tu contraseña · Primer Player", """
+        enviarConEnlace(e.email(), "recuperacion-password", e.solicitudId(), "Restablece tu contraseña · Primer Player",
+                () -> enlaces.emitirRecuperacion(e.usuarioId()), t -> """
                 Hola %s:
 
                 Recibimos una solicitud para restablecer la contraseña de tu cuenta en Primer Player.
-                Para elegir una nueva, abre este enlace (vence en 1 hora):
+                Para elegir una nueva, abre este enlace (vence en %s):
 
                 %s
 
                 Si no fuiste tú, ignora este correo: tu contraseña no cambiará.
-                """.formatted(e.nombre(), enlace));
+                """.formatted(e.nombre(), vigencia(t.vigencia()), enlace("/cuenta/restablecer", t.valor())));
     }
 
     @Async
@@ -140,30 +147,52 @@ class CorreosService {
 
     // ---------- envío ----------
 
-    private void verificacion(String email, String nombre, String token, String asunto) {
-        String enlace = enlace("/cuenta/verificar", token);
-        enviarUnaVez(email, "verificacion-cuenta", "token-" + huella(token), asunto + " · Primer Player", """
+    private void verificacion(long usuarioId, String email, String nombre, UUID solicitudId, String asunto) {
+        enviarConEnlace(email, "verificacion-cuenta", solicitudId, asunto + " · Primer Player",
+                () -> enlaces.emitirVerificacion(usuarioId), t -> """
                 Hola %s:
 
-                Para activar las compras en Primer Player, confirma tu correo abriendo este enlace (vence en 24 horas):
+                Para activar las compras en Primer Player, confirma tu correo abriendo este enlace (vence en %s):
 
                 %s
 
                 Si no creaste una cuenta, ignora este correo.
-                """.formatted(nombre, enlace));
+                """.formatted(nombre, vigencia(t.vigencia()), enlace("/cuenta/verificar", t.valor())));
+    }
+
+    /**
+     * Correo con enlace de un solo uso. El token se emite después de reservar el envío: un reintento del outbox de un
+     * correo que ya salió no genera enlaces nuevos. Si ya no corresponde (cuenta verificada o inactiva) no se envía y
+     * la reserva queda, así no se reintenta.
+     */
+    private void enviarConEnlace(String para, String plantilla, UUID solicitudId, String asunto,
+                                 Supplier<Optional<TokenEmitido>> emitir, Function<TokenEmitido, String> texto) {
+        enviarUnaVez(para, plantilla, "solicitud-" + solicitudId, asunto, () -> emitir.get().map(texto));
+    }
+
+    private void enviarUnaVez(String para, String plantilla, String referencia, String asunto, String texto) {
+        enviarUnaVez(para, plantilla, referencia, asunto, () -> Optional.of(texto));
     }
 
     /**
      * Registra primero (UNIQUE plantilla + referencia + destino): si ya estaba registrado, este correo ya salió y no
      * se repite. Si el envío falla, se borra el registro y la excepción hace que el outbox lo reintente.
+     *
+     * @param texto se arma después de reservar; vacío = ya no corresponde enviarlo
      */
-    private void enviarUnaVez(String para, String plantilla, String referencia, String asunto, String texto) {
+    private void enviarUnaVez(String para, String plantilla, String referencia, String asunto,
+                              Supplier<Optional<String>> texto) {
         if (!enviados.reservar(para, plantilla, referencia, clock.instant())) {
             log.info("Correo {} ya enviado (ref {}): se omite", plantilla, referencia);
             return;
         }
         try {
-            correo.enviar(para, asunto, texto);
+            Optional<String> cuerpo = texto.get();
+            if (cuerpo.isEmpty()) {
+                log.info("Correo {} ya no corresponde (ref {}): se omite", plantilla, referencia);
+                return;
+            }
+            correo.enviar(para, asunto, cuerpo.get());
             log.info("Correo {} enviado (ref {})", plantilla, referencia);
         } catch (RuntimeException ex) {
             enviados.liberar(para, plantilla, referencia);
@@ -176,13 +205,13 @@ class CorreosService {
         return UriComponentsBuilder.fromUriString(urlFront + ruta).queryParam("token", token).build().encode().toUriString();
     }
 
-    /** Referencia estable del token sin guardarlo: 16 caracteres de su SHA-256. */
-    private static String huella(String token) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(token.getBytes(StandardCharsets.UTF_8))).substring(0, 16);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException(ex);
+    /** "24 horas", "1 hora", "30 minutos". */
+    static String vigencia(Duration d) {
+        long horas = d.toHours();
+        if (horas >= 1 && d.toMinutesPart() == 0) {
+            return horas == 1 ? "1 hora" : horas + " horas";
         }
+        long minutos = d.toMinutes();
+        return minutos == 1 ? "1 minuto" : minutos + " minutos";
     }
 }

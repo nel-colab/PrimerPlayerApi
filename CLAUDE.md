@@ -34,6 +34,9 @@ docker compose up -d            # postgres, minio, mailpit
 ./mvnw verify                   # incluye ModularityTest y snapshot de OpenAPI
 ```
 
+Producción (runagard.cl, VPS con Docker, Jenkins + SonarQube + Grafana): ver `deploy/README.md`.
+Perfil `prod` en `application-prod.yaml`; Actuator escucha en el 8081 (solo red interna).
+
 ## Reglas que nunca se rompen
 
 1. **Montos** en CLP como `long` / `BIGINT`, nunca `double`, `float` ni `BigDecimal` con decimales.

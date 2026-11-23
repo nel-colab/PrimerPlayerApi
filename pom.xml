@@ -34,11 +34,21 @@
 		<transbank.version>6.2.1</transbank.version>
 		<shedlock.version>7.10.1</shedlock.version>
 		<awssdk.version>2.57.0</awssdk.version>
+		<jacoco.version>0.8.16</jacoco.version>
+		<sonar-maven-plugin.version>5.9.0.7382</sonar-maven-plugin.version>
+		<!-- SonarQube lee la cobertura que genera JaCoCo en verify -->
+		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<!-- /actuator/prometheus: métricas para Prometheus y Grafana (puerto interno 8081 en producción) -->
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -238,6 +248,16 @@
 	</dependencyManagement>
 
 	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<!-- ./mvnw sonar:sonar (Jenkins) -->
+					<groupId>org.sonarsource.scanner.maven</groupId>
+					<artifactId>sonar-maven-plugin</artifactId>
+					<version>${sonar-maven-plugin.version}</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -302,4 +322,35 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<profile>
+			<!-- ./mvnw -Pci verify: lo usa Jenkins. Localmente no hace falta (ni descargar JaCoCo). -->
+			<id>ci</id>
+			<build>
+				<plugins>
+					<plugin>
+						<!-- Cobertura de pruebas: target/site/jacoco/jacoco.xml (la usa SonarQube) -->
+						<groupId>org.jacoco</groupId>
+						<artifactId>jacoco-maven-plugin</artifactId>
+						<version>${jacoco.version}</version>
+						<executions>
+							<execution>
+								<id>preparar-agente</id>
+								<goals>
+									<goal>prepare-agent</goal>
+								</goals>
+							</execution>
+							<execution>
+								<id>reporte</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>report</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
