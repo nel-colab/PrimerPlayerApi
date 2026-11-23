@@ -18,7 +18,6 @@ services:
       - "443:443/udp"          # HTTP/3
     environment:
       DOMINIO: ${DOMINIO}
-      ACME_EMAIL: ${ACME_EMAIL}
       OPS_USUARIO: ${OPS_USUARIO}
       OPS_PASSWORD_HASH: ${OPS_PASSWORD_HASH}
     volumes:

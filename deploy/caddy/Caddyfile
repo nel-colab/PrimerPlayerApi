@@ -2,10 +2,6 @@
 # Las variables {$...} vienen de deploy/.env (ver docker-compose.yml).
 # Recargar tras un cambio: docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 
-{
-	email {$ACME_EMAIL}
-}
-
 (seguridad) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
