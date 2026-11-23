@@ -1,6 +1,6 @@
 # Alertas de Runagard (Grafana Alerting), enviadas por correo vía Brevo (GF_SMTP_* en docker-compose.ops.yml).
 # El destino sale de ALERTAS_DESTINO en deploy/.env (varios correos: separados por ";").
-# En los archivos de provisioning, "$$" es un "$" literal (un "$" solo se interpreta como variable de entorno).
+# Plantillas sin "$" (.Labels / .Values): ${VAR} sí se reemplaza por variables de entorno en este archivo.
 apiVersion: 1
 
 contactPoints:
@@ -37,9 +37,9 @@ groups:
         execErrState: Alerting
         labels: { severidad: critica }
         annotations:
-          summary: "{{ $$labels.job }} no responde"
+          summary: "{{ index .Labels \"job\" }} no responde"
           description: >-
-            Prometheus no logra leer «{{ $$labels.job }}» hace más de 2 minutos.
+            Prometheus no logra leer «{{ index .Labels "job" }}» hace más de 2 minutos.
             Revisa: cd /opt/runagard/deploy && docker compose ps (o docker compose -f docker-compose.ops.yml ps).
           runbook_url: https://grafana.runagard.cl/d/runagard-resumen
         data:
@@ -63,7 +63,7 @@ groups:
         execErrState: Error
         labels: { severidad: alta }
         annotations:
-          summary: "Disco al {{ printf \"%.0f\" $$values.A.Value }} %"
+          summary: "Disco al {{ printf \"%.0f\" .Values.A.Value }} %"
           description: >-
             Libera espacio: imágenes Docker sin uso (docker image prune -a), respaldos antiguos o logs.
             Si la tienda sigue creciendo, agrega almacenamiento en Contabo.
@@ -93,7 +93,7 @@ groups:
         execErrState: Error
         labels: { severidad: alta }
         annotations:
-          summary: "RAM al {{ printf \"%.0f\" $$values.A.Value }} % por más de 10 minutos"
+          summary: "RAM al {{ printf \"%.0f\" .Values.A.Value }} % por más de 10 minutos"
           description: >-
             Revisa en Grafana → Runagard · Resumen → «Memoria por contenedor» quién consume más.
             Lo habitual es un build de Jenkins o SonarQube; si se repite, mover CI/CD a otro VPS.
@@ -121,7 +121,7 @@ groups:
         execErrState: Error
         labels: { severidad: media }
         annotations:
-          summary: "CPU al {{ printf \"%.0f\" $$values.A.Value }} % por más de 15 minutos"
+          summary: "CPU al {{ printf \"%.0f\" .Values.A.Value }} % por más de 15 minutos"
           description: "Revisa «CPU por contenedor» en Runagard · Resumen."
         data:
           - refId: A
@@ -147,7 +147,7 @@ groups:
         execErrState: Error
         labels: { severidad: alta }
         annotations:
-          summary: "{{ printf \"%.0f\" $$values.A.Value }} errores 5xx de la API en 10 minutos"
+          summary: "{{ printf \"%.0f\" .Values.A.Value }} errores 5xx de la API en 10 minutos"
           description: "Detalle en Grafana → Runagard · Logs (servicio api, contiene: ERROR)."
         data:
           - refId: A
@@ -173,10 +173,10 @@ groups:
         execErrState: Error
         labels: { severidad: media }
         annotations:
-          summary: "Falló el último build de {{ $$labels.jenkins_job }}"
+          summary: 'Falló el último build de {{ index .Labels "jenkins_job" }}'
           description: >-
             Lo que estaba desplegado sigue funcionando (si el despliegue falla, Jenkins vuelve a la versión anterior).
-            Revisa el log en https://jenkins.runagard.cl/job/{{ $$labels.jenkins_job }}/lastBuild/console
+            Revisa el log en https://jenkins.runagard.cl/job/{{ index .Labels "jenkins_job" }}/lastBuild/console
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
