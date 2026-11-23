@@ -1,6 +1,7 @@
 package cl.primerplayer.catalogo.api;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import cl.primerplayer.shared.api.Pagina;
@@ -10,6 +11,15 @@ public interface ConsultarProductosAdminUseCase {
 
     /** @throws cl.primerplayer.shared.api.RecursoNoEncontradoException si no existe o está eliminado */
     ProductoAdmin obtener(long id);
+
+    /** Búsqueda exacta para importación, incluye productos no publicados. */
+    Optional<ProductoAdmin> porCodigoBarrasActivo(String codigo);
+
+    /** Búsqueda exacta, sin distinguir mayúsculas, para importación. */
+    Optional<ProductoAdmin> porNombreExacto(String nombre);
+
+    /** Productos no eliminados, incluidos los no publicados. */
+    List<ProductoAdmin> todosActivos();
 
     /**
      * Producto vendible por su código de barras (lo que escribe la pistola lectora en el POS, o el vendedor a mano):

@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,6 +31,7 @@ import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.FiltroProduct
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.IndicadoresProductos;
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.Orden;
 import cl.primerplayer.catalogo.api.ProductoAdmin;
+import cl.primerplayer.catalogo.infrastructure.excel.ProductosExcelService;
 import cl.primerplayer.shared.api.VersionRequeridaException;
 import cl.primerplayer.catalogo.web.dto.ProductoRequest;
 import cl.primerplayer.catalogo.web.dto.ProductoResponse;
@@ -57,6 +60,7 @@ class AdminProductosController {
     private final AdministrarProductosUseCase administrar;
     private final ConsultarProductosAdminUseCase consultar;
     private final CatalogoWebMapper mapper;
+    private final ProductosExcelService productosExcel;
 
     @GetMapping
     @Operation(summary = "Buscar productos (incluye ocultos)")
@@ -76,13 +80,32 @@ class AdminProductosController {
         return consultar.buscar(filtro).map(mapper::toResponse);
     }
 
+    // Sin `produces`: el formato lo decide `format` o el Accept dentro del método. Con `produces`, un Accept
+    // distinto (p. ej. application/octet-stream desde el frontend) hacía caer la petición en GET /{id}.
+    @GetMapping("/exportar")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Exportar todos los productos activos a JSON o Excel")
+    ResponseEntity<?> exportar(@RequestParam(defaultValue = "json") String format,
+                               @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) {
+        boolean excel = "excel".equalsIgnoreCase(format) || aceptaExcel(accept);
+        List<ProductoAdmin> productos = consultar.todosActivos();
+        if (!excel) {
+            return ResponseEntity.ok(productos.stream().map(mapper::toResponse).toList());
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"stock-productos.xlsx\"")
+                .body(productosExcel.exportarStock(productos));
+    }
+
     @GetMapping("/indicadores")
     @Operation(summary = "Totales para el panel: {total, stockBajo, agotados}")
     IndicadoresProductos indicadores() {
         return consultar.indicadores();
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     @Operation(summary = "Obtener un producto (ETag = versión)")
     ResponseEntity<ProductoResponse> obtener(@PathVariable long id) {
         return conEtag(ResponseEntity.ok(), consultar.obtener(id));
@@ -95,7 +118,7 @@ class AdminProductosController {
         return conEtag(ResponseEntity.created(URI.create("/api/v1/admin/productos/" + creado.id())), creado);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:\\d+}")
     @Operation(summary = "Reemplazar producto", description = "Exige If-Match con la versión leída. "
             + "Solo ADMIN agrega o cambia el código de barras y el límite ya configurado.")
     ResponseEntity<ProductoResponse> actualizar(@PathVariable long id,
@@ -106,13 +129,13 @@ class AdminProductosController {
         return conEtag(ResponseEntity.ok(), p);
     }
 
-    @PatchMapping("/{id}/publicacion")
+    @PatchMapping("/{id:\\d+}/publicacion")
     @Operation(summary = "Publicar u ocultar")
     ResponseEntity<ProductoResponse> publicacion(@PathVariable long id, @Valid @RequestBody PublicacionRequest request) {
         return conEtag(ResponseEntity.ok(), administrar.cambiarPublicacion(id, request.publicado()));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:\\d+}")
     @Operation(summary = "Eliminar (borrado lógico)")
     ResponseEntity<Void> eliminar(@PathVariable long id) {
         administrar.eliminar(id);
@@ -123,6 +146,16 @@ class AdminProductosController {
 
     private ResponseEntity<ProductoResponse> conEtag(ResponseEntity.BodyBuilder builder, ProductoAdmin p) {
         return builder.eTag("\"" + p.version() + "\"").body(mapper.toResponse(p));
+    }
+
+    private static boolean aceptaExcel(String accept) {
+        if (accept == null) {
+            return false;
+        }
+        return MediaType.parseMediaTypes(accept).stream()
+                .anyMatch(tipo -> !tipo.isWildcardType() && !tipo.isWildcardSubtype()
+                        && tipo.isCompatibleWith(MediaType.parseMediaType(
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")));
     }
 
     /** Acepta {@code "3"}, {@code 3} o {@code W/"3"}. */

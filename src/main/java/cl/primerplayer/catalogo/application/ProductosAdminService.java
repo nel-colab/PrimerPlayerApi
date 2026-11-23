@@ -2,6 +2,8 @@ package cl.primerplayer.catalogo.application;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,6 +79,30 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
     @Transactional(readOnly = true)
     public ProductoAdmin obtener(long id) {
         return ProductosAdmin.de(activo(id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ProductoAdmin> porCodigoBarrasActivo(String codigo) {
+        if (codigo == null || codigo.isBlank()) {
+            return Optional.empty();
+        }
+        return productos.buscarPorCodigoBarras(codigo.strip()).map(ProductosAdmin::de);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ProductoAdmin> porNombreExacto(String nombre) {
+        if (nombre == null || nombre.isBlank()) {
+            return Optional.empty();
+        }
+        return productos.buscarPorNombreExacto(nombre.strip()).map(ProductosAdmin::de);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductoAdmin> todosActivos() {
+        return productos.todosActivos().stream().map(ProductosAdmin::de).toList();
     }
 
     @Override

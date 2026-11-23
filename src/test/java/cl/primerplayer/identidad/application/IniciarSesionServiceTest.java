@@ -35,7 +35,8 @@ class IniciarSesionServiceTest {
         hasher = new Fakes.HasherFalso();
         var props = new IdentidadProperties(Duration.ofDays(30), Duration.ofHours(24),
                 new IdentidadProperties.Bloqueo(3, Duration.ofMinutes(15)), Duration.ofSeconds(10));
-        servicio = new IniciarSesionService(usuarios, refresh, hasher, new Fakes.EmisorFalso(), props,
+        servicio = new IniciarSesionService(usuarios, hasher,
+                new AperturaSesion(usuarios, refresh, new Fakes.EmisorFalso(), props), props,
                 Clock.fixed(AHORA, ZoneOffset.UTC));
         usuarios.guardarNuevo(Usuario.registrarCliente("Misty", "misty@celeste.cl", "hash:secreta123", AHORA));
     }

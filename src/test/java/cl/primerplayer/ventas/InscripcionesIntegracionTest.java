@@ -257,12 +257,12 @@ class InscripcionesIntegracionTest {
         Creada c = confirmada(cliente, e, 1);
 
         como(null, get(ME)).andExpect(status().isUnauthorized());
-        como(vendedor, get(ME)).andExpect(status().isForbidden());
-        como(admin, get(ME)).andExpect(status().isForbidden());
+        como(vendedor, get(ME)).andExpect(status().isOk());   // el personal también se inscribe
+        como(admin, get(ME)).andExpect(status().isOk());
         como(cliente, get(ME)).andExpect(status().isOk());
 
         cancelar(null, c.inscripcionId()).andExpect(status().isUnauthorized());
-        cancelar(vendedor, c.inscripcionId()).andExpect(status().isForbidden());
+        cancelar(vendedor, c.inscripcionId()).andExpect(status().isNotFound());   // ajena
 
         String inscritos = "/api/v1/admin/eventos/" + e + "/inscritos";
         como(null, get(inscritos)).andExpect(status().isUnauthorized());

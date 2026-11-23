@@ -57,6 +57,10 @@ pp:
     refresh-ttl: 30d
     refresh-gracia: 10s   # carrera entre pestañas: 401 sin revocar la familia
     verificacion-ttl: 24h
+    google:
+      # ID de cliente OAuth (aplicación web) de Google Cloud Console; el mismo que usa el frontend.
+      # Vacío = "Continuar con Google" deshabilitado (503 google-unavailable).
+      client-id: 787872539302-5lkjcuse2s9adeu38ocjl25h89o163is.apps.googleusercontent.com
     bloqueo:
       max-intentos: 5
       duracion: 15m

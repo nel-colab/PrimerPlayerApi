@@ -19,6 +19,10 @@ interface ProductoJpaRepository extends JpaRepository<ProductoEntity, Long>, Jpa
 
     Optional<ProductoEntity> findByCodigoBarrasAndEliminadoEnIsNull(String codigoBarras);
 
+    Optional<ProductoEntity> findFirstByNombreIgnoreCaseAndEliminadoEnIsNullOrderByIdAsc(String nombre);
+
+    List<ProductoEntity> findAllByEliminadoEnIsNullOrderByIdAsc();
+
     @Query(value = """
         SELECT count(*)                                                   AS total,
                count(*) FILTER (WHERE stock > 0 AND stock <= :umbral)      AS stockBajo,

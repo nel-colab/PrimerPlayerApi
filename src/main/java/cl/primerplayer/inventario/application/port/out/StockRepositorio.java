@@ -14,6 +14,9 @@ public interface StockRepositorio {
     /** {@code stock + delta} (delta con signo) si el producto está activo y el resultado no es negativo. */
     Optional<Integer> ajustar(long productoId, int delta);
 
+    /** Reemplaza el stock con bloqueo de fila y devuelve ambos valores para registrar el kardex. */
+    Optional<CambioStock> reemplazar(long productoId, int stock);
+
     /** {@code stock + cantidad} aunque el producto esté eliminado (devoluciones). Vacío si no existe. */
     Optional<Integer> reponer(long productoId, int cantidad);
 
@@ -22,4 +25,6 @@ public interface StockRepositorio {
 
     /** Existe el producto, aunque esté eliminado. */
     boolean existe(long productoId);
+
+    record CambioStock(int anterior, int actual) {}
 }

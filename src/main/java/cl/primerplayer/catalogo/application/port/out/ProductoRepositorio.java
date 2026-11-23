@@ -1,6 +1,7 @@
 package cl.primerplayer.catalogo.application.port.out;
 
 import java.util.Optional;
+import java.util.List;
 
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.FiltroProductos;
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.IndicadoresProductos;
@@ -15,6 +16,10 @@ public interface ProductoRepositorio {
 
     /** Producto no eliminado con ese código de barras exacto (único por índice parcial). */
     Optional<Producto> buscarPorCodigoBarras(String codigo);
+
+    Optional<Producto> buscarPorNombreExacto(String nombre);
+
+    List<Producto> todosActivos();
 
     /** @throws cl.primerplayer.catalogo.api.CodigoBarrasEnUsoException */
     Producto guardarNuevo(Producto producto);

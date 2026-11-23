@@ -17,9 +17,11 @@ import cl.primerplayer.inventario.api.StockInsuficienteException;
 import cl.primerplayer.inventario.api.TipoMovimiento;
 import cl.primerplayer.inventario.application.port.out.MovimientoStockRepositorio;
 import cl.primerplayer.inventario.application.port.out.StockRepositorio;
+import cl.primerplayer.inventario.application.port.out.StockRepositorio.CambioStock;
 import cl.primerplayer.inventario.domain.MovimientoStock;
 import cl.primerplayer.inventario.events.StockRepuesto;
 import cl.primerplayer.shared.api.RecursoNoEncontradoException;
+import cl.primerplayer.shared.api.ValidacionException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -40,6 +42,26 @@ class StockService implements InventarioOperaciones, AjustarStockUseCase {
         registrar(MovimientoStock.ajuste(a.productoId(), a.delta(), a.motivo(), a.usuarioId(), resultante,
                 clock.instant()));
         return new StockActual(a.productoId(), resultante);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public StockActual reemplazar(ReemplazoStock r) {
+        if (r.stock() < 0) {
+            throw new ValidacionException("stock", "El stock no puede ser negativo.");
+        }
+        if (r.motivo() == null || r.motivo().isBlank() || r.motivo().length() > 200) {
+            throw new ValidacionException("motivo", "El motivo es obligatorio y no debe exceder 200 caracteres.");
+        }
+        CambioStock cambio = stock.reemplazar(r.productoId(), r.stock())
+                .orElseThrow(() -> noExiste(r.productoId()));
+        int delta = cambio.actual() - cambio.anterior();
+        if (delta != 0) {
+            MovimientoStock movimiento = MovimientoStock.ajuste(r.productoId(), delta, r.motivo(), r.usuarioId(),
+                    cambio.actual(), clock.instant());
+            registrar(movimiento);
+        }
+        return new StockActual(r.productoId(), cambio.actual());
     }
 
     @Override

@@ -7,6 +7,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -49,6 +50,11 @@ class ManejadorErrores {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail cuerpoIlegible(HttpMessageNotReadableException ex, HttpServletRequest req) {
         return problema(HttpStatus.BAD_REQUEST, "validation", "El cuerpo de la solicitud no es JSON válido.", req);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail accesoDenegado(AccessDeniedException ex, HttpServletRequest req) {
+        return problema(HttpStatus.FORBIDDEN, "forbidden", "No tienes permiso para esta operación.", req);
     }
 
     @ExceptionHandler(Exception.class)

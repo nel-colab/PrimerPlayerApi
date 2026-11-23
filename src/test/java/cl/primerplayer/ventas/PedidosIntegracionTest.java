@@ -280,15 +280,15 @@ class PedidosIntegracionTest {
     // ---------- seguridad: rol × endpoint ----------
 
     @Test
-    void seguridad_misPedidosSoloCliente() throws Exception {
+    void seguridad_misPedidosConCualquierSesion_soloLosPropios() throws Exception {
         como(null, get(ME)).andExpect(status().isUnauthorized());
         como(cliente, get(ME)).andExpect(status().isOk());
-        como(vendedor, get(ME)).andExpect(status().isForbidden());
-        como(admin, get(ME)).andExpect(status().isForbidden());
+        como(vendedor, get(ME)).andExpect(status().isOk());   // el personal también compra
+        como(admin, get(ME)).andExpect(status().isOk());
 
         String codigo = web("S", "PAGADO");
         como(null, get(ME + "/" + codigo)).andExpect(status().isUnauthorized());
-        como(vendedor, get(ME + "/" + codigo)).andExpect(status().isForbidden());
+        como(vendedor, get(ME + "/" + codigo)).andExpect(status().isNotFound());   // pedido ajeno
     }
 
     @Test

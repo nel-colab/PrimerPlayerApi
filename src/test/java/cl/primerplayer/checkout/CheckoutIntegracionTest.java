@@ -411,14 +411,15 @@ class CheckoutIntegracionTest {
     // ---------- seguridad ----------
 
     @Test
-    void seguridad_checkoutSoloClienteYRetornoPublico() throws Exception {
+    void seguridad_checkoutConSesionDeCualquierRolYRetornoPublico() throws Exception {
         long p = producto(4990, 5, null);
         String body = carrito("product", p, 1);
         comprar(null, body, UUID.randomUUID().toString()).andExpect(status().isUnauthorized());
+        // el personal también compra en la tienda web
         comprar(TokensDePrueba.crear(jdbc, encoder, Rol.VENDEDOR), body, UUID.randomUUID().toString())
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated());
         comprar(TokensDePrueba.crear(jdbc, encoder, Rol.ADMIN), body, UUID.randomUUID().toString())
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated());
         comprar(cliente, body, UUID.randomUUID().toString()).andExpect(status().isCreated());
 
         mvc.perform(post("/api/v1/carrito/validacion").contentType(MediaType.APPLICATION_JSON).content(body))

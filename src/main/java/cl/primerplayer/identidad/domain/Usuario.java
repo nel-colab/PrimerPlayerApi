@@ -49,6 +49,13 @@ public final class Usuario {
                 Rol.CLIENTE, true, false, null, 0, null, ahora, null);
     }
 
+    /** Cuenta creada al entrar con Google: CLIENTE, sin contraseña y con el correo verificado por Google. */
+    public static Usuario registrarConGoogle(String nombre, String email, Instant ahora) {
+        String n = nombre == null || nombre.isBlank() ? email.substring(0, email.indexOf('@')) : nombre.strip();
+        return new Usuario(null, normalizarEmail(email), n.length() > 120 ? n.substring(0, 120) : n, null, null, null,
+                Rol.CLIENTE, true, false, ahora, 0, null, ahora, null);
+    }
+
     /** Usuario creado por la tienda (o la semilla de desarrollo): rol a elección y correo ya verificado. */
     public static Usuario crearVerificado(String nombre, String email, String passwordHash, Rol rol, Instant ahora) {
         return new Usuario(null, normalizarEmail(email), nombre.strip(), null, null, Objects.requireNonNull(passwordHash),
@@ -75,9 +82,16 @@ public final class Usuario {
         return email.strip().toLowerCase(Locale.ROOT);
     }
 
-    /** El cliente anónimo de mostrador, los inactivos y los eliminados nunca inician sesión. */
+    /**
+     * El cliente anónimo de mostrador, los inactivos y los eliminados nunca inician sesión. Una cuenta sin contraseña
+     * (creada con Google) sí puede: entra con Google, y con contraseña solo después de definirla.
+     */
     public boolean puedeIniciarSesion() {
-        return passwordHash != null && activo && !anonimo && eliminadoEn == null;
+        return activo && !anonimo && eliminadoEn == null;
+    }
+
+    public boolean tienePassword() {
+        return passwordHash != null;
     }
 
     /** Para comprar en la web: cuenta activa, no eliminada, no anónima y con el correo verificado. */

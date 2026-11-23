@@ -13,7 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.UUID;
+import java.io.ByteArrayInputStream;
 
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -248,6 +250,34 @@ class ProductosAdminIntegracionTest {
                 .andExpect(jsonPath("$[?(@.slug == 'figuras')].hijos[*].slug", org.hamcrest.Matchers.hasItem("figuras-naruto")));
         mvc.perform(get("/api/v1/franquicias")).andExpect(status().isOk())
                 .andExpect(jsonPath("$", org.hamcrest.Matchers.hasItem("Pokémon")));
+    }
+
+    @Test
+    void exportarStock_jsonSinPaginarYExcelPorNegociacionSoloAdmin() throws Exception {
+        crear(json("Exportar " + unico(), "tcg-pokemon", null, null));
+        int activos = jdbc.queryForObject("SELECT count(*) FROM producto WHERE eliminado_en IS NULL", Integer.class);
+
+        var json = como(admin, get(BASE + "/exportar").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").exists())
+                .andReturn().getResponse().getContentAsString();
+        assertThat((Integer) JsonPath.read(json, "$.length()")).isEqualTo(activos);
+
+        var respuesta = como(admin, get(BASE + "/exportar")
+                        .accept("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"stock-productos.xlsx\""))
+                .andReturn().getResponse();
+        assertThat(respuesta.getContentType())
+                .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(respuesta.getContentAsByteArray()))) {
+            assertThat(workbook.getNumberOfSheets()).isEqualTo(1);
+            assertThat(workbook.getSheetAt(0).getPhysicalNumberOfRows()).isEqualTo(activos + 1);
+        }
+
+        mvc.perform(get(BASE + "/exportar")).andExpect(status().isUnauthorized());
+        como(vendedor, get(BASE + "/exportar")).andExpect(status().isForbidden());
     }
 
     // ---------- matriz rol × endpoint ----------

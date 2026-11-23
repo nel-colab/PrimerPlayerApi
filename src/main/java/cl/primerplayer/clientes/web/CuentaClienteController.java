@@ -31,10 +31,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 
-/** Direcciones, favoritos y alertas de stock (solo CLIENTE; el id sale siempre del token). */
+/** Direcciones, favoritos y alertas de stock (cualquier usuario con sesión, incluido el personal; el id sale siempre del token). */
 @RestController
 @RequestMapping("/api/v1/me")
-@PreAuthorize("hasRole('CLIENTE')")
+@PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
 @RequiredArgsConstructor
 @Tag(name = "Cliente · Cuenta")
 @SecurityRequirement(name = "bearer")

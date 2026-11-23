@@ -8,6 +8,17 @@
 | `VENDEDOR` | Panel, stock, eventos, POS y cierre de caja. **No** accede a reportes ni estadísticas. |
 | `ADMIN` | Todo lo anterior + reportes, usuarios internos, auditoría, reembolsos, anulación de ventas POS y cambio de límites ya configurados. |
 
+- **Todos los roles compran**: VENDEDOR y ADMIN también usan `/me/**` y `POST /checkout` como cualquier cliente
+  (solo ven lo propio y acumulan su límite por cliente).
+- **Google**: el servidor valida el ID token (firma con las llaves de Google, `iss`, `aud` = client id, vigencia) y
+  exige `email_verified`. Google prueba que el correo es del dueño: vincula la cuenta existente con ese correo
+  (`usuario.google_sub`) y la marca verificada; si no existe crea un CLIENTE sin contraseña. Un `google_sub` por usuario.
+- **Correo verificado del personal**: VENDEDOR/ADMIN sin correo verificado reciben 403 `email-not-verified` en
+  `/admin/**`; lo verifican con el enlace o con Google (`POST /me/verificacion/google`). Para comprar ya se exigía.
+- **Perfil completo del personal**: VENDEDOR/ADMIN sin nombre, teléfono o RUT reciben 403 `profile-incomplete` en
+  `/admin/**` (se revisa en la base en cada request). Lo completan en `PUT /me/perfil`; `GET /me` expone
+  `profileComplete`. Comprar no exige perfil completo.
+
 ## Stock
 
 1. Nunca negativo. `CHECK (stock >= 0)` en la base.

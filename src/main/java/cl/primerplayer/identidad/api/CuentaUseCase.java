@@ -1,6 +1,8 @@
 package cl.primerplayer.identidad.api;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 import cl.primerplayer.shared.api.Rol;
 
@@ -40,5 +42,19 @@ public interface CuentaUseCase {
     void restablecerPassword(String token, String nueva);
 
     record Perfil(long id, String email, String nombre, Rol rol, String telefono, String rut, Instant miembroDesde,
-                  boolean emailVerificado, boolean cambioPasswordPendiente) {}
+                  boolean emailVerificado, boolean cambioPasswordPendiente) {
+
+        /** Campos de información personal que faltan (nombre, teléfono, RUT). Vacío = perfil completo. */
+        public List<String> camposFaltantes() {
+            List<String> faltan = new ArrayList<>(3);
+            if (nombre == null || nombre.isBlank()) faltan.add("nombre");
+            if (telefono == null || telefono.isBlank()) faltan.add("telefono");
+            if (rut == null || rut.isBlank()) faltan.add("rut");
+            return faltan;
+        }
+
+        public boolean completo() {
+            return camposFaltantes().isEmpty();
+        }
+    }
 }

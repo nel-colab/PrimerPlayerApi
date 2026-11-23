@@ -37,6 +37,31 @@ class UsuarioPersistenceAdapter implements UsuarioRepositorio {
     }
 
     @Override
+    public Optional<Usuario> buscarPorGoogleSub(String googleSub) {
+        return jdbc.queryForList("SELECT id FROM usuario WHERE google_sub = ? AND eliminado_en IS NULL", Long.class,
+                googleSub).stream().findFirst().flatMap(jpa::findById).map(UsuarioPersistenceAdapter::aDominio);
+    }
+
+    @Override
+    public Optional<String> googleSubDe(long usuarioId) {
+        return jdbc.queryForList("SELECT google_sub FROM usuario WHERE id = ? AND google_sub IS NOT NULL", String.class,
+                usuarioId).stream().findFirst();
+    }
+
+    @Override
+    public void vincularGoogle(long usuarioId, String googleSub, Instant ahora) {
+        var t = ahora.atOffset(java.time.ZoneOffset.UTC);
+        try {
+            jdbc.update("""
+                    UPDATE usuario SET google_sub = ?, email_verificado_en = coalesce(email_verificado_en, ?),
+                           actualizado_en = ?
+                    WHERE id = ?""", googleSub, t, t, usuarioId);
+        } catch (DataIntegrityViolationException ex) {   // uq_usuario_google_sub: carrera entre dos vinculaciones
+            throw new cl.primerplayer.identidad.api.GoogleCuentaEnUsoException();
+        }
+    }
+
+    @Override
     public Optional<Usuario> buscarPorEmail(String email) {
         return jpa.buscarPorEmail(email).map(UsuarioPersistenceAdapter::aDominio);
     }

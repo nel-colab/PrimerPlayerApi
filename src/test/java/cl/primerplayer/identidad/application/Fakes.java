@@ -46,6 +46,21 @@ final class Fakes {
         }
 
         @Override
+        public Optional<Usuario> buscarPorGoogleSub(String googleSub) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> googleSubDe(long usuarioId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void vincularGoogle(long usuarioId, String googleSub, Instant ahora) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public boolean enListaNegra(long usuarioId) {
             return false;
         }

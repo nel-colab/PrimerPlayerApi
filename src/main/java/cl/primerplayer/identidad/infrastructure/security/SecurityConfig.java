@@ -38,11 +38,14 @@ class SecurityConfig {
                 .requestMatchers("/api/v1/pagos/webpay/retorno").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/categorias", "/api/v1/franquicias",
                                  "/api/v1/productos", "/api/v1/productos/*", "/api/v1/productos/*/relacionados",
-                                 "/api/v1/eventos", "/api/v1/eventos/*", "/api/v1/agenda/ocupados").permitAll()
+                                 "/api/v1/eventos", "/api/v1/eventos/*", "/api/v1/agenda/ocupados",
+                                 "/api/v1/auth/google/config").permitAll()
                 .requestMatchers("/api/v1/openapi.json", "/api/v1/openapi.json/**",
                                  "/swagger-ui.html", "/swagger-ui/**", "/actuator/health").permitAll()
                 .requestMatchers("/api/v1/admin/reportes/**", "/api/v1/admin/usuarios", "/api/v1/admin/usuarios/**",
-                                 "/api/v1/admin/auditoria", "/api/v1/admin/auditoria/**").hasRole("ADMIN")
+                                 "/api/v1/admin/auditoria", "/api/v1/admin/auditoria/**",
+                                 "/api/v1/admin/productos/exportar", "/api/v1/admin/productos/importar")
+                .hasRole("ADMIN")
                 .requestMatchers("/api/v1/admin/**").hasAnyRole("VENDEDOR", "ADMIN")
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated())

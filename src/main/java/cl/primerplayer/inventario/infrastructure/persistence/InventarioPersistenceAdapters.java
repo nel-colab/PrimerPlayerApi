@@ -28,6 +28,10 @@ class StockPersistenceAdapter implements StockRepositorio {
 
     @Override public Optional<Integer> descontar(long productoId, int cantidad) { return jpa.descontar(productoId, cantidad); }
     @Override public Optional<Integer> ajustar(long productoId, int delta) { return jpa.ajustar(productoId, delta); }
+    @Override public Optional<CambioStock> reemplazar(long productoId, int stock) {
+        return jpa.reemplazar(productoId, stock)
+                .map(fila -> new CambioStock(fila.getAnterior(), fila.getActual()));
+    }
     @Override public Optional<Integer> reponer(long productoId, int cantidad) { return jpa.reponer(productoId, cantidad); }
     @Override public Optional<Integer> stockActivo(long productoId) { return jpa.stockActivo(productoId); }
     @Override public boolean existe(long productoId) { return jpa.existsById(productoId); }

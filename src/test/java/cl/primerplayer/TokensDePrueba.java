@@ -24,8 +24,10 @@ public final class TokensDePrueba {
 
     public static UsuarioConToken crear(JdbcTemplate jdbc, JwtEncoder encoder, Rol rol) {
         String email = rol.name().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8) + "@primerplayer.test";
-        Long id = jdbc.queryForObject(
-                "INSERT INTO usuario (email, nombre, rol, email_verificado_en) VALUES (?, ?, ?, now()) RETURNING id",
+        // Perfil completo (nombre, teléfono, RUT): el personal lo necesita para usar /admin/**
+        Long id = jdbc.queryForObject("""
+                INSERT INTO usuario (email, nombre, rol, email_verificado_en, telefono, rut)
+                VALUES (?, ?, ?, now(), '+56 9 1234 5678', '11111111-1') RETURNING id""",
                 Long.class, email, "Prueba " + rol, rol.name());
         Instant ahora = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()

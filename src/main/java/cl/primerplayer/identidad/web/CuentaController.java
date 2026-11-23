@@ -117,11 +117,14 @@ class CuentaController {
     record PerfilResponse(String email, String name,
                           @Schema(allowableValues = {"usuario", "vendedor", "admin"}) String role,
                           String phone, String rut, OffsetDateTime memberSince, boolean emailVerified,
-                          @Schema(description = "El administrador pidió cambiar la contraseña") boolean mustChangePassword) {
+                          @Schema(description = "El administrador pidió cambiar la contraseña") boolean mustChangePassword,
+                          @Schema(description = "Tiene nombre, teléfono y RUT. VENDEDOR/ADMIN lo necesitan para usar /admin/**")
+                          boolean profileComplete) {
 
         static PerfilResponse de(Perfil p) {
             return new PerfilResponse(p.email(), p.nombre(), p.rol().frontend(), p.telefono(), p.rut(),
-                    FechasTienda.enZona(p.miembroDesde()), p.emailVerificado(), p.cambioPasswordPendiente());
+                    FechasTienda.enZona(p.miembroDesde()), p.emailVerificado(), p.cambioPasswordPendiente(),
+                    p.completo());
         }
     }
 }

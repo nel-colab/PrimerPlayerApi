@@ -45,6 +45,11 @@ public final class Titulos {
             case "blacklisted" -> "Cuenta sin permiso para comprar";
             case "self-action" -> "No puedes aplicarte esta acción";
             case "last-admin" -> "Debe quedar al menos un administrador";
+            case "profile-incomplete" -> "Información personal incompleta";
+            case "invalid-google-token" -> "Google no confirmó tu identidad";
+            case "google-unavailable" -> "Google no está disponible";
+            case "google-email-mismatch" -> "La cuenta de Google tiene otro correo";
+            case "google-account-in-use" -> "Cuenta de Google ya vinculada";
             default -> "Error de negocio";
         };
     }

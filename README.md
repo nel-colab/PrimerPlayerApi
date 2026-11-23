@@ -410,6 +410,15 @@ primer-player-api/
 
 Tarjetas de prueba: ver la documentación de Webpay Plus en `transbankdevelopers.cl`.
 
+### Inicio de sesión con Google
+
+| Variable de entorno | Desarrollo (por defecto) | Producción |
+|---|---|---|
+| `PP_AUTH_GOOGLE_CLIENT_ID` | vacía = botón de Google sin función | ID de cliente OAuth "Aplicación web" de Google Cloud, con el dominio del frontend en "Orígenes autorizados de JavaScript" |
+
+Solo la lee el backend: el frontend la obtiene de `GET /api/v1/auth/google/config`. No es un secreto (Google la
+muestra en cada inicio de sesión), así que no se necesita el *client secret*.
+
 ### Endpoints disponibles
 
 | Área | Endpoints | Acceso |
@@ -426,6 +435,7 @@ Tarjetas de prueba: ver la documentación de Webpay Plus en `transbankdevelopers
 | Checkout | `POST /checkout` (encabezado `Idempotency-Key`) | CLIENTE con correo verificado |
 | Webpay | `GET`/`POST /pagos/webpay/retorno` (lo llama el navegador al volver de Transbank) | Público |
 | Productos (admin) | `GET`/`POST /admin/productos` · `GET`/`PUT`/`DELETE /admin/productos/{id}` · `PATCH /admin/productos/{id}/publicacion` · `GET /admin/productos/indicadores` | VENDEDOR, ADMIN |
+| Importación/exportación de stock | `GET /admin/productos/exportar` (JSON o XLSX) · `POST /admin/productos/importar` (JSON, XLSX o CSV) | ADMIN |
 | Inventario (admin) | `POST /admin/inventario/{id}/ajustes` · `GET /admin/inventario/{id}/movimientos` · `GET`/`PUT /admin/inventario/configuracion` | VENDEDOR, ADMIN |
 | Eventos (admin) | CRUD `/admin/eventos` · `PATCH /admin/eventos/{id}/publicacion` · `GET /admin/eventos/{id}/inscritos` | VENDEDOR, ADMIN |
 | Cumpleaños (admin) | `GET /admin/solicitudes-cumpleanos` · `POST …/{id}/aprobacion`, `…/{id}/rechazo` | VENDEDOR, ADMIN |
@@ -434,11 +444,22 @@ Tarjetas de prueba: ver la documentación de Webpay Plus en `transbankdevelopers
 | POS (anulación) | `POST /admin/pos/ventas/{codigo}/anulacion` | ADMIN |
 | Caja | `GET /admin/caja/{fecha}` · `PUT /admin/caja/{fecha}/cierre` · `GET /admin/caja/cierres` | VENDEDOR, ADMIN |
 | Archivos | `POST /admin/media/imagenes`, `/admin/media/comprobantes` (multipart `archivo`) · `GET /admin/media/comprobantes/{id}` | VENDEDOR, ADMIN |
-| Reportes | `GET /admin/reportes/dia`, `/por-hora`, `/por-dia`, `/por-mes` | ADMIN |
+| Reportes | `GET /admin/reportes/dia`, `/por-hora`, `/por-dia`, `/por-mes` (JSON); `/por-dia` y `/por-mes` también exportan XLSX con `format=excel` o `Accept` de Excel | ADMIN |
 | Auditoría | `GET /admin/auditoria` | ADMIN |
 | Usuarios | `GET /admin/usuarios`, `/admin/usuarios/indicadores` · `PATCH …/{id}/rol` · `POST`/`DELETE …/{id}/baneo`, `…/{id}/lista-negra` · `POST …/{id}/restablecimiento-password`, `…/{id}/verificacion`, `…/{id}/cierre-sesiones` | ADMIN |
 
 Todos bajo `/api/v1`. El detalle de parámetros y respuestas está en Swagger UI.
+
+`GET /admin/productos/exportar` devuelve el array JSON completo o un XLSX si se usa `?format=excel` o el `Accept`
+de Excel. `POST /admin/productos/importar` acepta `{ "filas": [...] }` o multipart con la parte `archivo` (`.xlsx`
+o `.csv`). Cada fila se procesa de forma independiente; `precio` es CLP entero. Para crear un producto nuevo se
+requiere `categoria` con el slug de una categoría hoja. En actualizaciones, los campos de texto opcionales vacíos
+conservan el valor actual; `precio` y `stock` vacíos se interpretan como cero, `publicado` vacío como `false`.
+Importar reemplaza el stock con una operación atómica y registra la diferencia en el kardex con motivo
+`Importación Excel`.
+
+`GET /admin/reportes/por-dia` acepta el filtro existente `mes=AAAA-MM` o `year` + `month`; `/por-mes` acepta `anio`
+o `year`. Ambos devuelven JSON por defecto y generan XLSX con `format=excel` o el `Accept` de Excel.
 
 `GET /admin/pedidos` incluye `phone` y `rut` del perfil del cliente (`null` si no están informados o si el canal es
 `tienda`). `PATCH /admin/pedidos/{codigo}/estado` acepta `{ "estado": "LISTO_RETIRO" | "ENTREGADO",

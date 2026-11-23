@@ -41,6 +41,19 @@ public interface UsuarioRepositorio {
 
     boolean enListaNegra(long usuarioId);
 
+    /** Usuario vinculado a esa cuenta de Google (no eliminado). */
+    Optional<Usuario> buscarPorGoogleSub(String googleSub);
+
+    /** {@code sub} de Google vinculado al usuario, si tiene. */
+    Optional<String> googleSubDe(long usuarioId);
+
+    /**
+     * Vincula la cuenta de Google y marca el correo como verificado (si no lo estaba).
+     *
+     * @throws cl.primerplayer.identidad.api.GoogleCuentaEnUsoException si ese {@code sub} ya está en otro usuario
+     */
+    void vincularGoogle(long usuarioId, String googleSub, Instant ahora);
+
     /** @param hasta {@code null} = permanente */
     record Baneo(String motivo, Instant hasta) {}
 }

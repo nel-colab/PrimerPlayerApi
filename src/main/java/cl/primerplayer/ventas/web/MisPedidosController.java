@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 /** "Mis pedidos": el cliente sale siempre del token, nunca del request. */
 @RestController
 @RequestMapping("/api/v1/me/pedidos")
-@PreAuthorize("hasRole('CLIENTE')")
+@PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
 @RequiredArgsConstructor
 @Tag(name = "Cliente · Pedidos")
 @SecurityRequirement(name = "bearer")

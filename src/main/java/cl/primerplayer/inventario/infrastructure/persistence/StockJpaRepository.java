@@ -27,6 +27,22 @@ interface StockJpaRepository extends Repository<ProductoStockEntity, Long> {
     Optional<Integer> ajustar(long id, int delta);
 
     @Query(value = """
+        WITH fila AS (
+            SELECT id, stock FROM producto
+            WHERE id = :id AND eliminado_en IS NULL
+            FOR UPDATE
+        ),
+        actualizado AS (
+            UPDATE producto p SET stock = :nuevoStock, actualizado_en = now()
+            FROM fila f
+            WHERE p.id = f.id
+            RETURNING f.stock AS anterior, p.stock AS actual
+        )
+        SELECT anterior, actual FROM actualizado
+        """, nativeQuery = true)
+    Optional<CambioStockFila> reemplazar(long id, int nuevoStock);
+
+    @Query(value = """
         UPDATE producto SET stock = stock + :cantidad, actualizado_en = now()
         WHERE id = :id
         RETURNING stock
@@ -37,4 +53,9 @@ interface StockJpaRepository extends Repository<ProductoStockEntity, Long> {
     Optional<Integer> stockActivo(long id);
 
     boolean existsById(Long id);
+
+    interface CambioStockFila {
+        int getAnterior();
+        int getActual();
+    }
 }

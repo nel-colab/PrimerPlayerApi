@@ -42,7 +42,7 @@ class SolicitudesCumpleanosController {
     // ---------- cliente (el id sale siempre del token) ----------
 
     @PostMapping("/api/v1/me/solicitudes-cumpleanos")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
     @Operation(summary = "Solicitar un bloque para un cumpleaños",
             description = "Queda PENDIENTE hasta que la tienda la apruebe. Errores: validation (400), slot-taken (409).")
     ResponseEntity<SolicitudResponse> solicitar(@Valid @RequestBody SolicitudRequest req,
@@ -52,14 +52,14 @@ class SolicitudesCumpleanosController {
     }
 
     @GetMapping("/api/v1/me/solicitudes-cumpleanos")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
     @Operation(summary = "Mis solicitudes de cumpleaños")
     List<SolicitudResponse> mias(@AuthenticationPrincipal UsuarioActual usuario) {
         return solicitudes.deCliente(usuario.id()).stream().map(mapper::toCliente).toList();
     }
 
     @PostMapping("/api/v1/me/solicitudes-cumpleanos/{id}/cancelacion")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
     @Operation(summary = "Cancelar una solicitud pendiente", description = "Ajena: 404. No pendiente: 409 request-not-pending.")
     SolicitudResponse cancelar(@PathVariable long id, @AuthenticationPrincipal UsuarioActual usuario) {
         return mapper.toCliente(solicitudes.cancelar(usuario.id(), id));

@@ -203,12 +203,13 @@ class SolicitudesCumpleanosIntegracionTest {
     }
 
     @Test
-    void seguridad_meSoloCliente_bandejaSoloInternos() throws Exception {
+    void seguridad_meConCualquierSesion_bandejaSoloInternos() throws Exception {
         LocalDate dia = DiasDePrueba.siguiente();
         mvc.perform(get(ME)).andExpect(status().isUnauthorized());
-        como(vendedor, get(ME)).andExpect(status().isForbidden());
+        // el personal también puede pedir un cumpleaños para sí
+        como(vendedor, get(ME)).andExpect(status().isOk());
         como(vendedor, post(ME).contentType(MediaType.APPLICATION_JSON).content(solicitud(dia, 15, 17)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated());
         mvc.perform(get(TIENDA)).andExpect(status().isUnauthorized());
         como(cliente, get(TIENDA)).andExpect(status().isForbidden());
         como(cliente, post(TIENDA + "/1/aprobacion")).andExpect(status().isForbidden());

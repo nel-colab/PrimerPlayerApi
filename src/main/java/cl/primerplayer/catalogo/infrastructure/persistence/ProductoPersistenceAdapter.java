@@ -50,6 +50,21 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
     }
 
     @Override
+    public Optional<Producto> buscarPorNombreExacto(String nombre) {
+        return productos.findFirstByNombreIgnoreCaseAndEliminadoEnIsNullOrderByIdAsc(nombre)
+                .map(e -> aDominio(e, imagenesDe(imagenes.findByProductoIdOrderByPosicion(e.getId()))));
+    }
+
+    @Override
+    public List<Producto> todosActivos() {
+        List<ProductoEntity> filas = productos.findAllByEliminadoEnIsNullOrderByIdAsc();
+        List<Long> ids = filas.stream().map(ProductoEntity::getId).toList();
+        Map<Long, List<ImagenProducto>> imgs = ids.isEmpty() ? Map.of()
+                : resueltas.porProducto(imagenes.findByProductoIdIn(ids));
+        return filas.stream().map(e -> aDominio(e, imgs.getOrDefault(e.getId(), List.of()))).toList();
+    }
+
+    @Override
     public Producto guardarNuevo(Producto p) {
         ProductoEntity e = new ProductoEntity();
         e.setCreadoEn(p.actualizadoEn());

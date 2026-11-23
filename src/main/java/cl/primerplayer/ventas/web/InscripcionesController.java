@@ -31,14 +31,14 @@ class InscripcionesController {
     // ---------- cliente ----------
 
     @GetMapping("/api/v1/me/inscripciones")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
     @Operation(summary = "Mis inscripciones a eventos", description = "Próximas primero (la más cercana arriba), luego las pasadas.")
     List<InscripcionResponse> mias(@AuthenticationPrincipal UsuarioActual usuario) {
         return inscripciones.delCliente(usuario.id()).stream().map(mapper::toInscripcion).toList();
     }
 
     @PostMapping("/api/v1/me/inscripciones/{id}/cancelacion")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
     @Operation(summary = "Cancelar una inscripción pagada",
             description = "Libera los cupos. No reembolsa el pago automáticamente (lo gestiona la tienda). Errores: "
                     + "404 item-unavailable (no existe o es ajena), 409 registration-not-cancellable (pendiente de pago, "

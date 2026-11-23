@@ -11,7 +11,15 @@ public interface AjustarStockUseCase {
      */
     StockActual ajustar(AjusteStock ajuste);
 
+    /**
+     * Reemplazo absoluto con bloqueo atómico, reservado para operaciones de importación.
+     * La operación requiere que el caso de uso orquestador abra la transacción.
+     */
+    StockActual reemplazar(ReemplazoStock reemplazo);
+
     record AjusteStock(long productoId, int delta, String motivo, long usuarioId) {}
+
+    record ReemplazoStock(long productoId, int stock, String motivo, long usuarioId) {}
 
     record StockActual(long productoId, int stock) {}
 }

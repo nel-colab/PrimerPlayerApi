@@ -19,7 +19,6 @@ import cl.primerplayer.checkout.web.dto.CarritoRequest;
 import cl.primerplayer.checkout.web.dto.CheckoutResponse;
 import cl.primerplayer.checkout.web.dto.ValidacionCarritoResponse;
 import cl.primerplayer.shared.api.FechasTienda;
-import cl.primerplayer.shared.api.Rol;
 import cl.primerplayer.shared.api.UsuarioActual;
 import cl.primerplayer.shared.api.ValidacionException;
 import cl.primerplayer.ventas.api.VentaWebUseCase.LineaCarrito;
@@ -39,12 +38,12 @@ class CheckoutController {
     private final CheckoutUseCase checkout;
 
     @PostMapping("/carrito/validacion")
-    @Operation(summary = "Revisar el carrito (público; con sesión de cliente también evalúa su límite de compra)",
+    @Operation(summary = "Revisar el carrito (público; con sesión también evalúa el límite de compra del usuario)",
             description = "No reserva nada. Siempre 200: los problemas por línea vienen en errors[] (item-unavailable, "
                     + "out-of-stock, stock-limit, event-full, event-past, purchase-limit, invalid-quantity).")
     ValidacionCarritoResponse validar(@Valid @RequestBody CarritoRequest req,
                                       @AuthenticationPrincipal UsuarioActual usuario) {
-        Long clienteId = usuario != null && usuario.rol() == Rol.CLIENTE ? usuario.id() : null;
+        Long clienteId = usuario != null ? usuario.id() : null;   // el personal también compra y acumula límite
         var v = checkout.validar(clienteId, lineas(req));
         return new ValidacionCarritoResponse(
                 v.lineas().stream().map(l -> new ValidacionCarritoResponse.Linea(l.tipo(), l.itemId(), l.nombre(),
@@ -53,10 +52,10 @@ class CheckoutController {
     }
 
     @PostMapping("/checkout")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE','VENDEDOR','ADMIN')")
     @SecurityRequirement(name = "bearer")
     @Operation(summary = "Crear el pedido y empezar el pago con Webpay",
-            description = "Requiere sesión de cliente con correo verificado (403 email-not-verified). Reserva stock y "
+            description = "Requiere sesión (cliente, vendedor o admin) con correo verificado (403 email-not-verified). Reserva stock y "
                     + "cupos por 15 min. Errores del carrito con errors[] por línea; idempotency-conflict (409); "
                     + "payment-provider-error (502).")
     ResponseEntity<CheckoutResponse> checkout(

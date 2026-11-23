@@ -260,8 +260,9 @@ class CuentaClienteIntegracionTest {
     void seguridad() throws Exception {
         UsuarioConToken vendedor = TokensDePrueba.crear(jdbc, encoder, Rol.VENDEDOR);
         mvc.perform(get("/api/v1/me/direcciones")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/v1/me/direcciones").header(HttpHeaders.AUTHORIZATION, vendedor.bearer())).andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/me/favoritos").header(HttpHeaders.AUTHORIZATION, vendedor.bearer())).andExpect(status().isForbidden());
+        // el personal también tiene cuenta de compra
+        mvc.perform(get("/api/v1/me/direcciones").header(HttpHeaders.AUTHORIZATION, vendedor.bearer())).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/me/favoritos").header(HttpHeaders.AUTHORIZATION, vendedor.bearer())).andExpect(status().isOk());
         mvc.perform(get("/api/v1/me/perfil")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me/perfil").header(HttpHeaders.AUTHORIZATION, vendedor.bearer())).andExpect(status().isOk());
     }

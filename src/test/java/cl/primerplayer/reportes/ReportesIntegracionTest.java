@@ -2,13 +2,16 @@ package cl.primerplayer.reportes;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.io.ByteArrayInputStream;
 import java.util.UUID;
 
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -17,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -154,6 +158,29 @@ class ReportesIntegracionTest {
                 .andExpect(jsonPath("$.tramos[6].monto").value(4000))
                 .andExpect(jsonPath("$.total").value(31000))
                 .andExpect(jsonPath("$.ordenes").value(4));
+    }
+
+    @Test
+    void porDiaYPorMes_exportanExcelPorParametroYNegociacion() throws Exception {
+        var mensual = mvc.perform(get("/api/v1/admin/reportes/por-dia")
+                        .param("year", "2018").param("month", "3").param("format", "excel")
+                        .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                        .header(HttpHeaders.AUTHORIZATION, admin.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"ventas-2018-03.xlsx\""))
+                .andReturn().getResponse();
+        try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(mensual.getContentAsByteArray()))) {
+            org.assertj.core.api.Assertions.assertThat(workbook.getSheetName(0)).isEqualTo("Resumen del mes");
+            org.assertj.core.api.Assertions.assertThat(workbook.getSheetName(1)).isEqualTo("Por día");
+        }
+
+        mvc.perform(get("/api/v1/admin/reportes/por-mes").param("year", "2018")
+                        .header(HttpHeaders.ACCEPT, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        .header(HttpHeaders.AUTHORIZATION, admin.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"ventas-2018.xlsx\""));
     }
 
     @Test

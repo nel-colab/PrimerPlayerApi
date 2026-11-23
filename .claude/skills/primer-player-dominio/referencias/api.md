@@ -33,9 +33,11 @@ Error `application/problem+json` (RFC 9457), siempre con `code`:
 | `payments-mismatch`, `receipt-required`, `transfer-proof-required`, `tcg-card-required`, `cash-change-mismatch` | 422 |
 | `barcode-taken`, `barcode-immutable`, `version-conflict`, `idempotency-conflict` | 409 |
 | `slot-taken`, `request-not-pending` | 409 |
+| `google-email-mismatch`, `google-account-in-use` | 409 |
+| `google-unavailable` | 503 |
 | `precondition-required` (falta `If-Match`) | 428 |
-| `limit-admin-only`, `forbidden`, `email-not-verified` | 403 |
-| `unauthorized` | 401 |
+| `limit-admin-only`, `forbidden`, `email-not-verified`, `profile-incomplete` | 403 |
+| `unauthorized`, `invalid-google-token` | 401 |
 | `account-locked` | 423 |
 | `rate-limited` (con `Retry-After`) | 429 |
 
@@ -48,6 +50,9 @@ Error `application/problem+json` (RFC 9457), siempre con `code`:
 | POST | `/auth/registro` | público | `{nombre, email, password}` → 201; envía verificación |
 | POST | `/auth/verificacion` | público | `{token}` → 204 |
 | POST | `/auth/login` | público | `{email, password}` → `{accessToken, expiresIn, user}` + cookie `pp_rt` |
+| GET | `/auth/google/config` | público | `{clientId, enabled}` para el botón de Google Identity Services |
+| POST | `/auth/google` | público | `{credential}` (ID token de Google) → igual que el login. Vincula por correo o crea CLIENTE sin contraseña |
+| POST | `/me/verificacion/google` | sesión | `{credential}` → perfil con `emailVerified: true`; 409 si Google confirma otro correo |
 | POST | `/auth/refresh` | cookie `pp_rt` | rota el refresh; reuso → revoca familia; exige `X-Requested-With: pp-web` |
 | POST | `/auth/logout` | cookie | 204, revoca familia y borra cookie |
 | POST | `/auth/recuperacion` | público | `{email}` → 202 siempre |
@@ -60,15 +65,15 @@ Error `application/problem+json` (RFC 9457), siempre con `code`:
 
 | Método | Ruta | Rol |
 | --- | --- | --- |
-| GET/PUT | `/me/perfil` | CLIENTE |
-| GET/POST/PUT/DELETE | `/me/direcciones[/{id}]` | CLIENTE |
-| GET/PUT/DELETE | `/me/favoritos[/{productoId}]` | CLIENTE |
-| GET/PUT/DELETE | `/me/alertas-stock[/{productoId}]` | CLIENTE |
-| GET | `/me/pedidos`, `/me/pedidos/{codigo}` | CLIENTE |
-| GET | `/me/inscripciones` | CLIENTE |
-| GET, POST | `/me/solicitudes-cumpleanos` | CLIENTE |
-| POST | `/me/solicitudes-cumpleanos/{id}/cancelacion` | CLIENTE |
-| POST | `/me/inscripciones/{id}/cancelacion` | CLIENTE |
+| GET/PUT | `/me/perfil` | Con sesión (todos los roles) |
+| GET/POST/PUT/DELETE | `/me/direcciones[/{id}]` | Con sesión (todos los roles) |
+| GET/PUT/DELETE | `/me/favoritos[/{productoId}]` | Con sesión (todos los roles) |
+| GET/PUT/DELETE | `/me/alertas-stock[/{productoId}]` | Con sesión (todos los roles) |
+| GET | `/me/pedidos`, `/me/pedidos/{codigo}` | Con sesión (todos los roles) |
+| GET | `/me/inscripciones` | Con sesión (todos los roles) |
+| GET, POST | `/me/solicitudes-cumpleanos` | Con sesión (todos los roles) |
+| POST | `/me/solicitudes-cumpleanos/{id}/cancelacion` | Con sesión (todos los roles) |
+| POST | `/me/inscripciones/{id}/cancelacion` | Con sesión (todos los roles) |
 
 Recurso de otro cliente → **404** (no revela existencia).
 
@@ -92,7 +97,7 @@ calculadas sobre el resultado filtrado sin la propia faceta.
 | Método | Ruta | Rol | Notas |
 | --- | --- | --- | --- |
 | POST | `/carrito/validacion` | público (sesión opcional) | `{lineas:[{type,itemId,quantity}]}` → precios, stock, cupos, `errors[]` por línea |
-| POST | `/checkout` | CLIENTE | `Idempotency-Key` obligatoria → 201 `{pedido, pago:{proveedor, url, token}}` |
+| POST | `/checkout` | Con sesión (todos los roles) | `Idempotency-Key` obligatoria → 201 `{pedido, pago:{proveedor, url, token}}` |
 | GET, POST | `/pagos/webpay/retorno` | Transbank | 303 → `/pago/resultado?pedido=PP-...` |
 | POST | `/admin/pedidos/{codigo}/reembolso` | ADMIN | `{monto, motivo}` |
 
@@ -101,6 +106,8 @@ calculadas sobre el resultado filtrado sin la propia faceta.
 | Método | Ruta | Rol | Notas |
 | --- | --- | --- | --- |
 | GET | `/admin/productos` | VENDEDOR | `q` (nombre, id o código), `categoria[]`, `estado[]` (publicado, oculto, stock-bajo, agotado), `sort`, `page` |
+| GET | `/admin/productos/exportar` | ADMIN | Array JSON con todos los productos activos o XLSX vía `Accept` / `format=excel` |
+| POST | `/admin/productos/importar` | ADMIN | `{filas:[...]}` JSON o multipart `archivo` XLSX/CSV; procesa filas individualmente, categoría (slug hoja) obligatoria para crear, reemplaza stock registrando ajuste |
 | GET | `/admin/productos/indicadores` | VENDEDOR | `{total, stockBajo, agotados}` |
 | POST | `/admin/productos` | VENDEDOR | `imagenes[{archivoId \| url, portada}]` |
 | PUT | `/admin/productos/{id}` | VENDEDOR | `If-Match: <version>`; código de barras y límite ya configurado: solo ADMIN los agrega/cambia |
@@ -133,7 +140,8 @@ calculadas sobre el resultado filtrado sin la propia faceta.
 
 ### Reportes y auditoría (solo ADMIN)
 
-`GET /admin/reportes/dia?fecha=`, `/por-hora?fecha=`, `/por-dia?mes=2026-11`, `/por-mes?anio=2026`,
+`GET /admin/reportes/dia?fecha=`, `/por-hora?fecha=`, `/por-dia?mes=2026-11` (también `year` + `month`),
+`/por-mes?anio=2026` (también `year`), `/por-dia` y `/por-mes` aceptan `format=excel` o `Accept` XLSX,
 `GET /admin/auditoria?entidad=&entidadId=&desde=&hasta=&page=`.
 
 ## Ejemplos
