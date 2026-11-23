@@ -62,8 +62,10 @@ pipeline {
             steps {
                 sh '''
                     # Configuración de despliegue versionada en el repo (el .env y los respaldos se quedan en el VPS).
-                    rsync -a --exclude .env --exclude respaldos/ deploy/ "$DEPLOY_DIR/"
-                    chmod +x "$DEPLOY_DIR"/scripts/*.sh
+                    # -rlc: copia por contenido, sin fechas/permisos/dueño. Las carpetas pueden ser de otro usuario
+                    # del grupo compartido (gid 1000) y Jenkins no podría cambiarles la fecha (rsync -a falla con 23).
+                    rsync -rlc --exclude .env --exclude respaldos/ deploy/ "$DEPLOY_DIR/"
+                    chmod +x "$DEPLOY_DIR"/scripts/*.sh 2>/dev/null || true
 
                     cd "$DEPLOY_DIR"
                     docker compose up -d --no-deps api
