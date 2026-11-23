@@ -2,6 +2,18 @@
 # Las variables {$...} vienen de deploy/.env (ver docker-compose.yml).
 # Recargar tras un cambio: docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 
+{
+	# Métricas de tráfico por dominio (Prometheus las lee de :2020, solo dentro de la red de Docker)
+	metrics {
+		per_host
+	}
+}
+
+# Endpoint de métricas: el puerto 2020 no se publica en el host (docker-compose.yml solo publica 80 y 443).
+:2020 {
+	metrics
+}
+
 (seguridad) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -64,6 +76,11 @@ import sitios/*.caddy
 # Imágenes públicas y comprobantes con URL firmada. Solo lectura: la API escribe por la red interna.
 media.{$DOMINIO} {
 	import seguridad
+	# Las métricas y la administración de MinIO nunca se publican (Prometheus las lee por la red interna).
+	@interno path /minio/*
+	handle @interno {
+		respond 404
+	}
 	@lectura method GET HEAD
 	handle @lectura {
 		reverse_proxy minio:9000

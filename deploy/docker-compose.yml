@@ -103,6 +103,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_PROMETHEUS_AUTH_TYPE: public   # /minio/v2/metrics: solo red interna; Caddy lo bloquea en media.<dominio>
     volumes:
       - miniodata:/data
     networks: [edge]           # Caddy publica solo lectura (GET/HEAD) en media.<dominio>
