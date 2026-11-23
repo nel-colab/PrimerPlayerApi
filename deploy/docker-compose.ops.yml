@@ -111,6 +111,8 @@ services:
       GF_SMTP_USER: ${SPRING_MAIL_USERNAME}
       GF_SMTP_PASSWORD: ${SPRING_MAIL_PASSWORD}
       GF_SMTP_FROM_ADDRESS: ${ALERTAS_REMITENTE}
+      GF_SMTP_FROM_NAME: Alertas Runagard
+      ALERTAS_DESTINO: ${ALERTAS_DESTINO}   # lo lee provisioning/alerting/alertas.yml
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
