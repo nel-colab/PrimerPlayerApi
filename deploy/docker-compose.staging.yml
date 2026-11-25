@@ -1,0 +1,109 @@
+# Staging: copia de la tienda para probar la rama develop antes de pasar a main.
+# Mismo VPS que producción, pero con base, MinIO y secretos propios (deploy/.env.staging, nunca va a git).
+#
+#   https://staging.<dominio>        → front-staging · /api/** → api-staging
+#   https://media-staging.<dominio>  → minio-staging (solo lectura)
+#
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d postgres-staging minio-staging
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging ps
+#
+# Los servicios llevan el sufijo -staging porque comparten la red runagard-edge con producción: Caddy los resuelve
+# por nombre y un "api" repetido haría que Docker reparta tráfico entre ambos.
+# Los rangos de memoria son menores que en producción: el VPS es compartido.
+
+name: runagard-staging
+
+services:
+  front-staging:
+    image: runagard/front:${FRONT_TAG:-staging}
+    restart: unless-stopped
+    environment:
+      PORT: "4000"
+      NG_ALLOWED_HOSTS: staging.${DOMINIO},localhost   # localhost: para el healthcheck
+    networks: [edge]
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api-staging:
+    image: runagard/api:${API_TAG:-staging}
+    restart: unless-stopped
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+      minio-staging:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-staging:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "5"
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      PP_MAIL_REMITENTE: ${PP_MAIL_REMITENTE}
+      PP_URL_FRONT: https://staging.${DOMINIO}
+      PP_AUTH_JWT_SECRETO: ${PP_AUTH_JWT_SECRETO}
+      PP_AUTH_GOOGLE_CLIENT_ID: ${PP_AUTH_GOOGLE_CLIENT_ID}
+      PP_MEDIA_ENDPOINT: http://minio-staging:9000
+      PP_MEDIA_ACCESS_KEY: ${MINIO_ROOT_USER}
+      PP_MEDIA_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      PP_MEDIA_URL_PUBLICA: https://media-staging.${DOMINIO}
+      PP_CHECKOUT_URL_RETORNO: https://staging.${DOMINIO}/api/v1/pagos/webpay/retorno
+      PP_CHECKOUT_URL_RESULTADO: https://staging.${DOMINIO}/pago/resultado
+      # Staging nunca cobra de verdad: Webpay siempre en integración (credenciales públicas de prueba).
+      PP_WEBPAY_AMBIENTE: integracion
+      PP_WEBPAY_CODIGO_COMERCIO: ""
+      PP_WEBPAY_API_KEY: ""
+      PP_WEBPAY_URL_FORMULARIO: https://webpay3gint.transbank.cl/webpayserver/initTransaction
+    networks: [edge, datos]
+    mem_limit: 768m
+
+  postgres-staging:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: UTC
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [datos]
+    shm_size: 128m
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  minio-staging:
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    user: "0:0"
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    networks: [edge]           # Caddy publica solo lectura (GET/HEAD) en media-staging.<dominio>
+    mem_limit: 256m
+
+networks:
+  edge:
+    name: runagard-edge        # la de producción (docker-compose.yml): debe existir antes
+    external: true
+  datos:
+    name: runagard-staging-datos
+    internal: true             # sin salida a internet; separada de la base de producción
+
+volumes:
+  pgdata:
+  miniodata:

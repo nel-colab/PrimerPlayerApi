@@ -46,7 +46,7 @@ groups:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: prometheus
-            model: { refId: A, expr: "min by (job) (up)", instant: true }
+            model: { refId: A, expr: "min by (job) (up{job!=\"api-staging\"})", instant: true }
           - refId: C
             datasourceUid: __expr__
             model:

@@ -51,34 +51,39 @@ unclassified:
     hookSecretConfigs:
       - credentialsId: "github-webhook-secret"
 
-# Un job por repositorio: rama main, Jenkinsfile del repo, se dispara con el webhook de GitHub (push).
+# Dos jobs por repositorio: main → producción (runagard-api, runagard-front) y develop → staging
+# (runagard-api-staging, runagard-front-staging). Mismo Jenkinsfile: el entorno lo decide la rama.
+# Se disparan con el webhook de GitHub (push); cada job solo construye si su rama cambió.
 jobs:
   - script: >
       def owner = '${GITHUB_OWNER}';
+      def entornos = [[rama: 'main', sufijo: '', etiqueta: 'producción'], [rama: 'develop', sufijo: '-staging', etiqueta: 'staging']];
       [api: 'PrimerPlayerApi', front: 'PrimerPlayerFront'].each { nombre, repo ->
-        pipelineJob('runagard-' + nombre) {
-          description('Pruebas, SonarQube, imagen Docker y despliegue de ' + repo + ' (rama main)')
-          properties {
-            githubProjectUrl('https://github.com/' + owner + '/' + repo)
-            pipelineTriggers {
-              triggers {
-                githubPush()
-              }
-            }
-          }
-          definition {
-            cpsScm {
-              scm {
-                git {
-                  remote {
-                    url('https://github.com/' + owner + '/' + repo + '.git')
-                    credentials('github-token')
-                  }
-                  branch('*/main')
+        entornos.each { e ->
+          pipelineJob('runagard-' + nombre + e.sufijo) {
+            description('Pruebas, SonarQube, imagen Docker y despliegue de ' + repo + ' (rama ' + e.rama + ' → ' + e.etiqueta + ')')
+            properties {
+              githubProjectUrl('https://github.com/' + owner + '/' + repo)
+              pipelineTriggers {
+                triggers {
+                  githubPush()
                 }
               }
-              scriptPath('Jenkinsfile')
-              lightweight(true)
+            }
+            definition {
+              cpsScm {
+                scm {
+                  git {
+                    remote {
+                      url('https://github.com/' + owner + '/' + repo + '.git')
+                      credentials('github-token')
+                    }
+                    branch('*/' + e.rama)
+                  }
+                }
+                scriptPath('Jenkinsfile')
+                lightweight(true)
+              }
             }
           }
         }

@@ -90,6 +90,47 @@ media.{$DOMINIO} {
 	}
 }
 
+# ---------- staging (rama develop, docker-compose.staging.yml) ----------
+# Sin basic_auth: el front manda "Authorization: Bearer" a la API y chocaría con la clave de Caddy.
+# Se oculta a los buscadores con X-Robots-Tag. Webpay en staging siempre es de integración.
+
+staging.{$DOMINIO} {
+	import seguridad
+	header X-Robots-Tag "noindex, nofollow"
+	encode zstd gzip
+
+	handle /salud {
+		rewrite * /actuator/health/readiness
+		reverse_proxy api-staging:8081
+	}
+
+	handle /api/* {
+		reverse_proxy api-staging:8080
+	}
+
+	handle {
+		reverse_proxy front-staging:4000
+	}
+
+	log
+}
+
+media-staging.{$DOMINIO} {
+	import seguridad
+	header X-Robots-Tag "noindex, nofollow"
+	@interno path /minio/*
+	handle @interno {
+		respond 404
+	}
+	@lectura method GET HEAD
+	handle @lectura {
+		reverse_proxy minio-staging:9000
+	}
+	handle {
+		respond "Método no permitido" 405
+	}
+}
+
 # ---------- herramientas ----------
 
 jenkins.{$DOMINIO} {

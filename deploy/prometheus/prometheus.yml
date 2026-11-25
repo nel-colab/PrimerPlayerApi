@@ -23,6 +23,11 @@ scrape_configs:
     static_configs:
       - targets: ["api:8081"]
 
+  - job_name: api-staging               # la API de staging (rama develop); fuera de las alertas de producción
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["api-staging:8081"]
+
   - job_name: postgres
     static_configs:
       - targets: ["postgres-exporter:9187"]

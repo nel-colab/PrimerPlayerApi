@@ -1,12 +1,14 @@
 # Despliegue en producción — runagard.cl
 
 Todo corre en un VPS (Contabo, Ubuntu 24.04, 8 GB) con Docker. El código está en GitHub y Jenkins despliega solo
-con cada `git push` a `main`.
+con cada `git push`: `main` → producción (`runagard.cl`), `develop` → staging (`staging.runagard.cl`, sección 14).
 
 ```
 Internet ──► Caddy :443 (HTTPS automático, Let's Encrypt)
               ├─ runagard.cl            → front (Angular SSR)   ·  /api/** → api (Spring Boot)  ·  /salud → estado
               ├─ media.runagard.cl      → MinIO (solo lectura: imágenes y comprobantes firmados)
+              ├─ staging.runagard.cl    → front-staging · /api/** → api-staging   (rama develop)
+              ├─ media-staging.runagard.cl → minio-staging
               ├─ jenkins.runagard.cl    → Jenkins    ┐
               ├─ sonar.runagard.cl      → SonarQube  ├─ clave de Caddy + login propio de cada herramienta
               └─ grafana.runagard.cl    → Grafana    ┘
@@ -16,11 +18,13 @@ PostgreSQL: red interna sin internet · Actuator/métricas: puerto 8081, solo de
 | Archivo | Qué es |
 |---|---|
 | `docker-compose.yml` | Tienda: caddy, front, api, postgres, minio (proyecto `runagard`) |
+| `docker-compose.staging.yml` | Staging (rama develop): front, api, postgres y minio propios (`runagard-staging`) |
 | `docker-compose.ops.yml` | Herramientas: jenkins, sonarqube, prometheus, grafana, loki, alloy, exporters (`runagard-ops`) |
 | `caddy/Caddyfile` | Dominios, HTTPS y rutas |
 | `jenkins/` | Imagen de Jenkins (JDK 25, Node 24, Docker) y su configuración como código (`casc/casc.yaml`) |
 | `prometheus/`, `grafana/`, `loki/`, `alloy/` | Monitoreo: métricas, paneles y logs |
 | `.env.example` | Todas las variables. En el VPS se copia a `.env` (nunca va a git) |
+| `.env.staging.example` | Variables de staging. En el VPS se copia a `.env.staging` (nunca va a git) |
 | `scripts/` | Preparar el servidor y respaldar la base |
 
 Los `Jenkinsfile` están en la raíz de cada repo (`PrimerPlayerApi` y `PrimerPlayerFront`).
@@ -39,6 +43,8 @@ Zona DNS de `runagard.cl` → registros **A** apuntando a la IP del VPS:
 | `jenkins` | A | IP del VPS |
 | `sonar` | A | IP del VPS |
 | `grafana` | A | IP del VPS |
+| `staging` | A | IP del VPS |
+| `media-staging` | A | IP del VPS |
 
 Opcional, `runagard.store` y `runagard.online` → redirigen a `runagard.cl`: registros **A** `@` y `www` → IP del VPS,
 y luego activar `caddy/sitios/redirecciones.caddy.ejemplo` (instrucciones dentro del archivo).
@@ -188,6 +194,46 @@ o Cloudflare R2; instrucciones en el script). **Prueba restaurar** al menos una 
 
 UptimeRobot (gratis): monitor HTTPS a `https://runagard.cl/salud` cada 5 min, con aviso a tu correo.
 
+## 14. Staging (rama `develop`)
+
+Copia de la tienda en el mismo VPS para probar `develop` antes de pasarlo a `main`: base, MinIO y secretos propios,
+Webpay siempre en integración y `noindex` para los buscadores. No lleva la clave de Caddy (chocaría con el
+`Authorization: Bearer` que el front manda a la API): no subas datos reales.
+
+| Rama | Jobs de Jenkins | Imágenes | Sitio |
+|---|---|---|---|
+| `main` | `runagard-api`, `runagard-front` | `:latest` / `:anterior` | `https://runagard.cl` |
+| `develop` | `runagard-api-staging`, `runagard-front-staging` | `:staging` / `:staging-anterior` | `https://staging.runagard.cl` |
+
+Ambas ramas usan el mismo `Jenkinsfile`: el entorno lo decide la rama. SonarQube tiene un proyecto por rama
+(`runagard-api-develop`, `runagard-front-develop`). Solo el pipeline de `main` sincroniza `deploy/` y recarga Caddy;
+el de `develop` copia únicamente `docker-compose.staging.yml`. Un cambio de Caddy, Prometheus, Grafana o Jenkins
+llega al servidor cuando entra a `main`.
+
+Puesta en marcha (una vez):
+
+1. DNS: registros **A** `staging` y `media-staging` → IP del VPS (sección 1).
+2. Google: en la consola de Google Cloud, agrega `https://staging.runagard.cl` a los *Orígenes de JavaScript
+   autorizados* del cliente OAuth (si no, el login con Google falla en staging).
+3. Lleva estos cambios a `main` (push a `main`): el pipeline de la API copia el Caddyfile nuevo, el compose de
+   staging, Prometheus y la configuración de Jenkins al VPS.
+4. En el VPS:
+
+   ```bash
+   cd /opt/runagard/deploy
+   cp .env.staging.example .env.staging && chmod 660 .env.staging
+   nano .env.staging                     # claves NUEVAS, distintas a las de producción
+   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d postgres-staging minio-staging
+   docker compose -f docker-compose.ops.yml restart jenkins prometheus grafana   # jobs nuevos, métricas, alertas
+   ```
+
+5. En Jenkins: **runagard-api-staging → Construir ahora**, luego **runagard-front-staging → Construir ahora**.
+   Desde aquí, cada push a `develop` despliega staging solo.
+6. Tu administrador en staging: regístrate en `https://staging.runagard.cl` y aplica el `UPDATE` de la sección 10
+   con `docker compose -f docker-compose.staging.yml --env-file .env.staging exec postgres-staging psql -U runagard -d runagard_staging -c "..."`.
+
+Flujo recomendado: ramas de trabajo → PR a `develop` → se prueba en staging → PR de `develop` a `main`.
+
 ---
 
 ## Día a día
@@ -195,6 +241,9 @@ UptimeRobot (gratis): monitor HTTPS a `https://runagard.cl/salud` cada 5 min, co
 | Quiero… | Cómo |
 |---|---|
 | Desplegar | `git push` a `main` (o "Construir ahora" en Jenkins) |
+| Desplegar a staging | `git push` a `develop` |
+| Comandos de staging | `docker compose -f docker-compose.staging.yml --env-file .env.staging <ps\|logs -f api-staging\|…>` |
+| Volver atrás en staging | `API_TAG=staging-anterior docker compose -f docker-compose.staging.yml --env-file .env.staging up -d api-staging` |
 | Volver a la versión anterior | `cd /opt/runagard/deploy && API_TAG=anterior docker compose up -d api` (o `FRONT_TAG=anterior … front`) |
 | Volver a un commit concreto | `API_TAG=<8 primeros caracteres del commit> docker compose up -d api` |
 | Cambiar una variable | editar `.env` y `docker compose up -d api` (o el servicio que la use) |
@@ -206,7 +255,9 @@ UptimeRobot (gratis): monitor HTTPS a `https://runagard.cl/salud` cada 5 min, co
 ## Memoria (8 GB)
 
 Topes por servicio: API 1,25 GB · PostgreSQL 768 MB · front 384 MB · MinIO 512 MB · Jenkins 3 GB (incluye los
-builds) · SonarQube 2,5 GB · monitoreo ~1,3 GB. No se usan todos a la vez; Jenkins corre un build a la vez.
+builds) · SonarQube 2,5 GB · monitoreo ~1,3 GB · staging ~1,5 GB (API 768 MB, PostgreSQL, MinIO y front 256 MB
+cada uno). No se usan todos a la vez; Jenkins corre un build a la vez. Si falta RAM, staging es lo primero que se
+puede apagar: `docker compose -f docker-compose.staging.yml --env-file .env.staging stop`.
 Si Grafana muestra RAM sostenida > 90 %, lo primero es mover Jenkins y SonarQube a otro VPS: solo cambia dónde
 corre `docker-compose.ops.yml`.
 
