@@ -16,6 +16,9 @@ public interface UsuarioRepositorio {
     /** Incluye inactivos y eliminados (para historiales). */
     java.util.List<Usuario> buscarPorIds(java.util.Collection<Long> ids);
 
+    /** ADMIN activos, no anónimos, no eliminados, sin baneo vigente en {@code ahora} y con correo verificado. */
+    java.util.List<Usuario> administradoresActivos(Instant ahora);
+
     boolean existeEmail(String email);
 
     /**

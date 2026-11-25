@@ -16,6 +16,12 @@ public interface ConsultarUsuarioUseCase {
      */
     Map<Long, UsuarioResumen> buscarPorIds(Collection<Long> ids);
 
+    /**
+     * Administradores a quienes se les puede escribir: rol ADMIN, activos, no eliminados, sin baneo vigente y con el
+     * correo verificado (avisos de la tienda, por ejemplo productos esperando aprobación).
+     */
+    java.util.List<UsuarioResumen> administradoresActivos();
+
     /** {@code true} si el usuario existe, está activo, no está bloqueado y verificó su correo (requisito para comprar). */
     boolean puedeComprar(long id);
 

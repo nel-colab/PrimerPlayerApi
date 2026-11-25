@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import cl.primerplayer.catalogo.application.port.out.ProductoRepositorio;
 import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio;
 import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio.Revision;
 import cl.primerplayer.catalogo.domain.Producto;
+import cl.primerplayer.catalogo.events.ProductoEnRevision;
 import cl.primerplayer.shared.api.Pagina;
 import cl.primerplayer.shared.api.RecursoNoEncontradoException;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
     private final ReferenciasProducto referencias;
     private final UmbralStockBajo umbral;
     private final Clock clock;
+    private final ApplicationEventPublisher eventos;
 
     // ---------- comandos ----------
 
@@ -51,7 +54,8 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
         Producto nuevo = productos.guardarNuevo(
                 Producto.crear(datos, LocalDate.ofInstant(ahora, ZONA_TIENDA), ahora, requiereAprobacion));
         if (requiereAprobacion) {
-            revisiones.crear(nuevo.id(), TipoRevision.ALTA, null, nuevo.version(), actor.usuarioId(), ahora);
+            long rev = revisiones.crear(nuevo.id(), TipoRevision.ALTA, null, nuevo.version(), actor.usuarioId(), ahora);
+            avisarAlta(rev, nuevo, actor, ahora);
         }
         return ProductosAdmin.de(nuevo);
     }
@@ -82,7 +86,8 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
                     .reenviarARevision(ahora);
             Producto guardado = productos.actualizar(cambiado, versionEsperada);
             if (revisiones.pendienteDe(id).isEmpty()) {   // estaba rechazada: vuelve a la bandeja
-                revisiones.crear(id, TipoRevision.ALTA, null, guardado.version(), actor.usuarioId(), ahora);
+                long rev = revisiones.crear(id, TipoRevision.ALTA, null, guardado.version(), actor.usuarioId(), ahora);
+                avisarAlta(rev, guardado, actor, ahora);
             }
             return new ResultadoCambio(ProductosAdmin.de(guardado), false);
         }
@@ -144,12 +149,26 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
                     revisiones.resolver(r.id(), EstadoRevision.DESCARTADA, null, actor.usuarioId(), ahora));
             return new ResultadoCambio(ProductosAdmin.de(activo(id)), false);
         }
+        long rev;
         if (pendiente.isPresent()) {
-            revisiones.reemplazarPropuesta(pendiente.get().id(), propuestos, actual.version(), actor.usuarioId(), ahora);
+            rev = pendiente.get().id();
+            revisiones.reemplazarPropuesta(rev, propuestos, actual.version(), actor.usuarioId(), ahora);
         } else {
-            revisiones.crear(id, TipoRevision.EDICION, propuestos, actual.version(), actor.usuarioId(), ahora);
+            rev = revisiones.crear(id, TipoRevision.EDICION, propuestos, actual.version(), actor.usuarioId(), ahora);
+        }
+        // Solo un cambio de precio amerita avisar por correo; el resto espera en la bandeja.
+        // notificaciones envía una sola vez por revisión y precio propuesto.
+        if (propuestos.precio() != actual.datos().precio()) {
+            eventos.publishEvent(new ProductoEnRevision(rev, id, actual.datos().nombre(), false,
+                    actual.datos().precio(), propuestos.precio(), actor.usuarioId(), ahora));
         }
         return new ResultadoCambio(ProductosAdmin.de(activo(id)), true);
+    }
+
+    /** Producto nuevo (o alta rechazada que el vendedor corrigió) esperando aprobación: aviso a los ADMIN. */
+    private void avisarAlta(long revisionId, Producto producto, Actor actor, Instant ahora) {
+        eventos.publishEvent(new ProductoEnRevision(revisionId, producto.id(), producto.datos().nombre(), true, null,
+                producto.datos().precio(), actor.usuarioId(), ahora));
     }
 
     private void cerrarAltaPendiente(long productoId, EstadoRevision estado, Actor actor, Instant ahora) {

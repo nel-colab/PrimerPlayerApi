@@ -77,6 +77,17 @@ class UsuarioPersistenceAdapter implements UsuarioRepositorio {
     }
 
     @Override
+    public java.util.List<Usuario> administradoresActivos(Instant ahora) {
+        java.util.List<Long> ids = jdbc.queryForList("""
+                SELECT id FROM usuario
+                WHERE rol = 'ADMIN' AND activo AND NOT es_anonimo AND eliminado_en IS NULL
+                  AND email_verificado_en IS NOT NULL
+                  AND NOT (baneo_motivo IS NOT NULL AND (baneo_hasta IS NULL OR baneo_hasta > ?))
+                ORDER BY id""", Long.class, ahora.atOffset(java.time.ZoneOffset.UTC));
+        return ids.isEmpty() ? java.util.List.of() : buscarPorIds(ids);
+    }
+
+    @Override
     public boolean existeEmail(String email) {
         return jpa.existeEmail(email);
     }

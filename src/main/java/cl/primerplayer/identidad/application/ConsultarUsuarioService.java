@@ -16,6 +16,13 @@ import lombok.RequiredArgsConstructor;
 class ConsultarUsuarioService implements ConsultarUsuarioUseCase {
 
     private final UsuarioRepositorio usuarios;
+    private final java.time.Clock clock;
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<UsuarioResumen> administradoresActivos() {
+        return usuarios.administradoresActivos(clock.instant()).stream().map(UsuarioResumenes::de).toList();
+    }
 
     @Override
     @Transactional(readOnly = true)

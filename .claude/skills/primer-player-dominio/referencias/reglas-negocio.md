@@ -122,7 +122,12 @@ ADMIN se aplica directo. Tabla `producto_revision`; a lo más una revisión `PEN
 - Importación Excel: solo ADMIN, así que lo importado queda aprobado.
 - Concurrencia: aprobar/rechazar bloquea la revisión (`FOR UPDATE`); dos ADMIN a la vez → el segundo recibe
   `review-not-pending`. Dos propuestas simultáneas chocan con el índice único parcial → `version-conflict`.
-- Pendiente: avisar por correo al ADMIN de una revisión nueva y al vendedor del resultado (no hay eventos todavía).
+- **Aviso por correo a los ADMIN** (evento `catalogo.events.ProductoEnRevision` → `notificaciones`): cuando un
+  VENDEDOR crea un producto (o reenvía un alta rechazada) y cuando propone una edición con un **precio distinto** del
+  aprobado. Otros cambios esperan en la bandeja sin correo. Va a cada ADMIN activo, sin baneo y con correo verificado,
+  con un enlace a `/admin/aprobaciones` del frontend. Un correo por revisión y precio propuesto (`correo_enviado`):
+  reenviar el mismo precio no repite el aviso; proponer otro precio sí.
+- Pendiente: avisar al vendedor del resultado (aprobado o rechazado con motivo).
 
 ## Pedido
 

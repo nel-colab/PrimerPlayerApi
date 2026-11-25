@@ -177,7 +177,10 @@ vendedor esos errores salen **al proponer**, igual que antes.
 
 ### 3. Bandeja de revisiones
 
-Nueva ruta en el panel, por ejemplo `/admin/aprobaciones`, con `data: { roles: ['vendedor', 'admin'] }`. Agrégala
+Nueva ruta en el panel, **exactamente** `/admin/aprobaciones`, con `data: { roles: ['vendedor', 'admin'] }`. El
+backend envía a los administradores un correo con un enlace a esa ruta cuando un vendedor crea un producto o propone
+un cambio de precio: si la ruta cambia, el enlace queda roto. Si el usuario no tiene sesión iniciada, el enlace debe
+pasar por el login y volver a la bandeja. Agrégala
 al menú del panel con un contador de pendientes (`totalElements` de `estado=PENDIENTE&size=1`).
 
 1. Filtro por estado: Pendientes (por defecto), Aprobadas, Rechazadas, Descartadas y Todas. Con paginación.

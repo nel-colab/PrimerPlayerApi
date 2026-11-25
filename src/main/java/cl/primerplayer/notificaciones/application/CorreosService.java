@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import cl.primerplayer.catalogo.events.ProductoEnRevision;
 import cl.primerplayer.clientes.events.AlertaStockDisparada;
 import cl.primerplayer.identidad.api.ConsultarUsuarioUseCase;
 import cl.primerplayer.identidad.api.EnlacesCuentaUseCase;
@@ -143,6 +144,47 @@ class CorreosService {
 
                 %s/producto/%d
                 """.formatted(e.nombre(), e.productoNombre(), urlFront, e.productoId()));
+    }
+
+    /**
+     * Aviso a cada ADMIN: un vendedor creó un producto o le cambió el precio y espera aprobación. Uno por destinatario,
+     * revisión y precio propuesto: si el vendedor vuelve a proponer otro precio en la misma revisión, llega otro aviso.
+     */
+    @Async
+    @TransactionalEventListener
+    void alQuedarProductoEnRevision(ProductoEnRevision e) {
+        List<UsuarioResumen> admins = usuarios.administradoresActivos();
+        if (admins.isEmpty()) {
+            log.warn("Producto {} espera aprobación y no hay administradores activos a quienes avisar", e.productoId());
+            return;
+        }
+        String vendedor = Optional.ofNullable(usuarios.buscarPorIds(List.of(e.solicitadoPor())).get(e.solicitadoPor()))
+                .map(UsuarioResumen::nombre).orElse("Un vendedor");
+        String referencia = "revision-" + e.revisionId() + "-precio-" + e.precioPropuesto();
+        String asunto = (e.productoNuevo() ? "Producto nuevo por aprobar: " : "Cambio de precio por aprobar: ")
+                + e.productoNombre();
+        String detalle = e.productoNuevo()
+                ? "%s agregó un producto nuevo que no se publicará hasta que lo apruebes:%n%n  %s%n  Precio: %s"
+                        .formatted(vendedor, e.productoNombre(), clp(e.precioPropuesto()))
+                : ("%s propuso cambiar el precio de un producto. La tienda sigue vendiéndolo al precio actual hasta "
+                        + "que lo apruebes:%n%n  %s%n  Precio actual: %s%n  Precio propuesto: %s")
+                        .formatted(vendedor, e.productoNombre(), clp(e.precioActual()), clp(e.precioPropuesto()));
+        for (UsuarioResumen admin : admins) {
+            enviarUnaVez(admin.email(), "producto-en-revision", referencia, asunto + " · Primer Player", """
+                    Hola %s:
+
+                    %s
+
+                    Revísalo y apruébalo lo antes posible en el panel:
+
+                    %s/admin/aprobaciones
+                    """.formatted(admin.nombre(), detalle, urlFront));
+        }
+    }
+
+    /** {@code $4.990}: CLP sin decimales con separador de miles chileno. */
+    static String clp(long monto) {
+        return String.format(java.util.Locale.forLanguageTag("es-CL"), "$%,d", monto);
     }
 
     // ---------- envío ----------

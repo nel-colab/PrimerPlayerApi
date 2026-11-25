@@ -46,6 +46,13 @@ final class Fakes {
         }
 
         @Override
+        public java.util.List<Usuario> administradoresActivos(Instant ahora) {
+            return porId.values().stream()
+                    .filter(u -> u.rol() == cl.primerplayer.shared.api.Rol.ADMIN && !baneos.containsKey(u.id()))
+                    .toList();
+        }
+
+        @Override
         public Optional<Usuario> buscarPorGoogleSub(String googleSub) {
             return Optional.empty();
         }

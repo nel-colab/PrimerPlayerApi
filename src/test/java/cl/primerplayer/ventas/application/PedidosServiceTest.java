@@ -83,6 +83,8 @@ class PedidosServiceTest {
         @Override public boolean puedeComprar(long id) { return todos.containsKey(id); }
 
         @Override public long clienteMostradorId() { return 1; }
+
+        @Override public List<UsuarioResumen> administradoresActivos() { return List.of(); }
     }
 
     final PedidosEnMemoria repo = new PedidosEnMemoria();
