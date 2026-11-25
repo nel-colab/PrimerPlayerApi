@@ -23,6 +23,13 @@ interface ProductoJpaRepository extends JpaRepository<ProductoEntity, Long>, Jpa
 
     List<ProductoEntity> findAllByEliminadoEnIsNullOrderByIdAsc();
 
+    /** De esos productos, los que tienen una edición de un VENDEDOR esperando aprobación. */
+    @Query(value = """
+        SELECT producto_id FROM producto_revision
+        WHERE estado = 'PENDIENTE' AND tipo = 'EDICION' AND producto_id IN (:ids)
+        """, nativeQuery = true)
+    List<Long> conEdicionPendiente(Collection<Long> ids);
+
     @Query(value = """
         SELECT count(*)                                                   AS total,
                count(*) FILTER (WHERE stock > 0 AND stock <= :umbral)      AS stockBajo,

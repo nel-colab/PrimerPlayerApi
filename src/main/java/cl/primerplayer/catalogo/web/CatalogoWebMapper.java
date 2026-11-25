@@ -16,6 +16,9 @@ import cl.primerplayer.catalogo.api.ProductoAdmin;
 import cl.primerplayer.catalogo.web.dto.ImagenDto;
 import cl.primerplayer.catalogo.web.dto.ProductoRequest;
 import cl.primerplayer.catalogo.web.dto.ProductoResponse;
+import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.RevisionProducto;
+import cl.primerplayer.catalogo.web.dto.RevisionDtos.PropuestaResponse;
+import cl.primerplayer.catalogo.web.dto.RevisionDtos.RevisionResponse;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 interface CatalogoWebMapper {
@@ -43,6 +46,44 @@ interface CatalogoWebMapper {
         var p = resultado.pagina();
         return new CatalogoPaginaResponse(p.content().stream().map(this::toPublico).toList(),
                 p.page(), p.size(), p.totalElements(), p.totalPages(), resultado.facetas());
+    }
+
+    default RevisionResponse toRevision(RevisionProducto r) {
+        DatosProducto p = r.propuesto();
+        PropuestaResponse propuesto = p == null ? null : new PropuestaResponse(p.nombre(), p.descripcion(), p.precio(),
+                p.categoria(), p.tipo(), p.idioma(), p.marca(), p.plataforma(), p.franquicia(), p.linea(),
+                p.codigoBarras(), p.limitePorCliente(), p.publicado(), portada(p.imagenes()),
+                p.imagenes().stream().map(this::toDto).toList());
+        List<String> campos = p == null || r.actual() == null ? List.of() : camposModificados(r.actual(), p);
+        return new RevisionResponse(r.id(), r.productoId(), r.tipo(), r.estado(),
+                r.actual() == null ? null : toResponse(r.actual()), propuesto, campos, r.desactualizada(),
+                r.motivoRechazo(), r.solicitadoPor(), r.solicitadoEn(), r.revisadoPor(), r.revisadoEn());
+    }
+
+    /** Nombres de campo como los ve el frontend ({@code limitePorUsuario}, no {@code limitePorCliente}). */
+    default List<String> camposModificados(ProductoAdmin a, DatosProducto p) {
+        List<String> c = new java.util.ArrayList<>();
+        if (!java.util.Objects.equals(a.nombre(), p.nombre())) c.add("nombre");
+        if (!java.util.Objects.equals(a.descripcion(), p.descripcion())) c.add("descripcion");
+        if (a.precio() != p.precio()) c.add("precio");
+        if (!java.util.Objects.equals(a.categoria(), p.categoria())) c.add("categoria");
+        if (!java.util.Objects.equals(a.tipo(), p.tipo())) c.add("tipo");
+        if (!java.util.Objects.equals(a.idioma(), p.idioma())) c.add("idioma");
+        if (!java.util.Objects.equals(a.marca(), p.marca())) c.add("marca");
+        if (!java.util.Objects.equals(a.plataforma(), p.plataforma())) c.add("plataforma");
+        if (!java.util.Objects.equals(a.franquicia(), p.franquicia())) c.add("franquicia");
+        if (!java.util.Objects.equals(a.linea(), p.linea())) c.add("linea");
+        if (!java.util.Objects.equals(a.codigoBarras(), p.codigoBarras())) c.add("codigoBarras");
+        if (!java.util.Objects.equals(a.limitePorCliente(), p.limitePorCliente())) c.add("limitePorUsuario");
+        if (a.publicado() != p.publicado()) c.add("publicado");
+        if (!clavesImagenes(a.imagenes()).equals(clavesImagenes(p.imagenes()))) c.add("imagenes");
+        return c;
+    }
+
+    default List<String> clavesImagenes(List<ImagenProducto> imagenes) {
+        return imagenes.stream()
+                .map(i -> (i.archivoId() != null ? "archivo:" + i.archivoId() : "url:" + i.url()) + ":" + i.portada())
+                .toList();
     }
 
     default String portada(List<ImagenProducto> imagenes) {

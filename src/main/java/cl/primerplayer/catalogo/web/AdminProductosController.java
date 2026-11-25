@@ -19,12 +19,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import cl.primerplayer.catalogo.api.AdministrarProductosUseCase;
+import cl.primerplayer.catalogo.api.AdministrarProductosUseCase.Actor;
+import cl.primerplayer.catalogo.api.AdministrarProductosUseCase.ResultadoCambio;
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase;
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.EstadoProducto;
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.FiltroProductos;
@@ -112,37 +113,53 @@ class AdminProductosController {
     }
 
     @PostMapping
-    @Operation(summary = "Crear producto (stock inicial 0)")
-    ResponseEntity<ProductoResponse> crear(@Valid @RequestBody ProductoRequest request) {
-        ProductoAdmin creado = administrar.crear(mapper.toDatos(request));
+    @Operation(summary = "Crear producto (stock inicial 0)",
+            description = "Creado por un VENDEDOR: queda aprobacion=PENDIENTE y sin publicar (aunque pida publicado) "
+                    + "hasta que un ADMIN lo apruebe en /admin/productos/revisiones. Creado por un ADMIN: APROBADO.")
+    ResponseEntity<ProductoResponse> crear(@Valid @RequestBody ProductoRequest request,
+                                           @AuthenticationPrincipal UsuarioActual usuario) {
+        ProductoAdmin creado = administrar.crear(mapper.toDatos(request), actor(usuario));
         return conEtag(ResponseEntity.created(URI.create("/api/v1/admin/productos/" + creado.id())), creado);
     }
 
     @PutMapping("/{id:\\d+}")
     @Operation(summary = "Reemplazar producto", description = "Exige If-Match con la versión leída. "
-            + "Solo ADMIN agrega o cambia el código de barras y el límite ya configurado.")
+            + "Solo ADMIN agrega o cambia el código de barras y el límite ya configurado. "
+            + "VENDEDOR sobre un producto APROBADO: 202 Accepted, el cambio queda pendiente de aprobación "
+            + "(cambioPendiente=true) y el cuerpo trae el producto sin cambios. En los demás casos, 200.")
     ResponseEntity<ProductoResponse> actualizar(@PathVariable long id,
                                                 @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
                                                 @Valid @RequestBody ProductoRequest request,
                                                 @AuthenticationPrincipal UsuarioActual usuario) {
-        ProductoAdmin p = administrar.actualizar(id, version(ifMatch), mapper.toDatos(request), usuario.rol());
-        return conEtag(ResponseEntity.ok(), p);
+        return respuesta(administrar.actualizar(id, version(ifMatch), mapper.toDatos(request), actor(usuario)));
     }
 
     @PatchMapping("/{id:\\d+}/publicacion")
-    @Operation(summary = "Publicar u ocultar")
-    ResponseEntity<ProductoResponse> publicacion(@PathVariable long id, @Valid @RequestBody PublicacionRequest request) {
-        return conEtag(ResponseEntity.ok(), administrar.cambiarPublicacion(id, request.publicado()));
+    @Operation(summary = "Publicar u ocultar", description = "Ocultar se aplica siempre. Publicar: ADMIN directo "
+            + "(si el producto no estaba aprobado, lo aprueba); VENDEDOR sobre un producto aprobado: 202, queda "
+            + "pendiente de aprobación; VENDEDOR sobre uno no aprobado: 409 product-not-approved.")
+    ResponseEntity<ProductoResponse> publicacion(@PathVariable long id, @Valid @RequestBody PublicacionRequest request,
+                                                 @AuthenticationPrincipal UsuarioActual usuario) {
+        return respuesta(administrar.cambiarPublicacion(id, request.publicado(), actor(usuario)));
     }
 
     @DeleteMapping("/{id:\\d+}")
-    @Operation(summary = "Eliminar (borrado lógico)")
-    ResponseEntity<Void> eliminar(@PathVariable long id) {
-        administrar.eliminar(id);
+    @Operation(summary = "Eliminar (borrado lógico)", description = "Descarta su revisión pendiente, si tenía.")
+    ResponseEntity<Void> eliminar(@PathVariable long id, @AuthenticationPrincipal UsuarioActual usuario) {
+        administrar.eliminar(id, actor(usuario));
         return ResponseEntity.noContent().build();
     }
 
     // ---------- helpers ----------
+
+    private static Actor actor(UsuarioActual usuario) {
+        return new Actor(usuario.id(), usuario.rol());
+    }
+
+    /** 202 si el cambio quedó esperando aprobación (el producto no cambió); 200 si se aplicó. */
+    private ResponseEntity<ProductoResponse> respuesta(ResultadoCambio r) {
+        return conEtag(r.enRevision() ? ResponseEntity.accepted() : ResponseEntity.ok(), r.producto());
+    }
 
     private ResponseEntity<ProductoResponse> conEtag(ResponseEntity.BodyBuilder builder, ProductoAdmin p) {
         return builder.eTag("\"" + p.version() + "\"").body(mapper.toResponse(p));

@@ -9,7 +9,7 @@ escribir entidades JPA o consultas. Este archivo es el mapa.
 | --- | --- | --- |
 | `identidad` | `usuario`, `refresh_token`, `token_un_uso` | V1 |
 | `clientes` | `direccion`, `favorito`, `alerta_stock` | V1, V2 |
-| `catalogo` | `categoria`, `franquicia`, `producto` (excepto la columna `stock`), `producto_imagen` | V2 |
+| `catalogo` | `categoria`, `franquicia`, `producto` (excepto la columna `stock`), `producto_imagen`; `producto.aprobacion` y `producto_revision` (aprobación de productos) | V2, V12 |
 | `inventario` | `producto.stock` (única columna que escribe), `movimiento_stock`, `config_inventario` | V2 |
 | `media` | `archivo` | V2 |
 | `eventos` | `evento`, `inscripcion`, `solicitud_cumpleanos` | V3, V7 |

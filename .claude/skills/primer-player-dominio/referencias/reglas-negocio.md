@@ -6,7 +6,7 @@
 | --- | --- |
 | `CLIENTE` (frontend: `usuario`) | Tienda pública y su perfil (`/me/**`). Solo ve sus propios pedidos e inscripciones. |
 | `VENDEDOR` | Panel, stock, eventos, POS y cierre de caja. **No** accede a reportes ni estadísticas. |
-| `ADMIN` | Todo lo anterior + reportes, usuarios internos, auditoría, reembolsos, anulación de ventas POS y cambio de límites ya configurados. |
+| `ADMIN` | Todo lo anterior + reportes, usuarios internos, auditoría, reembolsos, anulación de ventas POS, cambio de límites ya configurados y **aprobación de productos**. |
 
 - **Todos los roles compran**: VENDEDOR y ADMIN también usan `/me/**` y `POST /checkout` como cualquier cliente
   (solo ven lo propio y acumulan su límite por cliente).
@@ -96,6 +96,33 @@ Códigos que el frontend ya mapea:
   EAN-13 con dígito verificador válido. (Pregunta abierta: si la tienda usa códigos internos, relajar a 8–14 dígitos.)
 - Descripción con formato simple (párrafos, `## `, `- `); se guarda como texto, nunca HTML.
 - Categoría asignada siempre es una categoría **hoja**.
+
+## Aprobación de productos (autorización previa)
+
+Lo que un VENDEDOR crea o cambia no llega a la tienda (web ni POS) hasta que un **ADMIN** lo aprueba. Lo que hace un
+ADMIN se aplica directo. Tabla `producto_revision`; a lo más una revisión `PENDIENTE` por producto.
+
+- `producto.aprobacion`: `PENDIENTE` | `APROBADO` | `RECHAZADO`. Solo un producto `APROBADO` puede estar publicado
+  (`CHECK ck_producto_publicado_aprobado` como red final). Productos anteriores a V12 quedaron `APROBADO`.
+- **Alta** (`tipo = ALTA`): el VENDEDOR crea → `PENDIENTE` y `publicado = false` aunque pida publicar. Se le puede
+  cargar stock mientras espera, pero no se vende (la web y el POS exigen `publicado`). El VENDEDOR puede seguir
+  corrigiéndolo (se aplica directo porque no está a la venta). Aprobar → `APROBADO` y **publicado**. Rechazar (motivo
+  obligatorio) → `RECHAZADO`; si el vendedor lo edita vuelve a `PENDIENTE` con una revisión nueva.
+- **Edición** (`tipo = EDICION`): un PUT del VENDEDOR sobre un producto `APROBADO` **no se aplica**: queda como
+  propuesta (`datos_propuestos` JSONB) y responde **202** con el producto sin cambios y `cambioPendiente = true`. La
+  tienda sigue vendiendo lo aprobado. Las reglas del rol (`barcode-immutable`, `limit-admin-only`, `If-Match`) se
+  validan al proponer. Una nueva edición reemplaza la propuesta pendiente; proponer exactamente lo aprobado la descarta.
+  Aprobar copia lo propuesto al producto; rechazar la descarta y el producto no cambia.
+- **Propuesta desactualizada**: si el producto cambió después de proponer (versión ≠ `version_base`), aprobar da
+  409 `review-outdated` (no se pisan cambios ajenos); el ADMIN la rechaza y el vendedor la propone de nuevo.
+- **Publicación**: ocultar siempre se aplica directo (sacar de la venta es la dirección segura). Publicar: el ADMIN
+  directo (si el producto no estaba aprobado, publicarlo lo aprueba y cierra su revisión); el VENDEDOR sobre un
+  producto aprobado → propuesta (202); sobre uno no aprobado → 409 `product-not-approved`.
+- **Eliminar** un producto descarta su revisión pendiente (`DESCARTADA`).
+- Importación Excel: solo ADMIN, así que lo importado queda aprobado.
+- Concurrencia: aprobar/rechazar bloquea la revisión (`FOR UPDATE`); dos ADMIN a la vez → el segundo recibe
+  `review-not-pending`. Dos propuestas simultáneas chocan con el índice único parcial → `version-conflict`.
+- Pendiente: avisar por correo al ADMIN de una revisión nueva y al vendedor del resultado (no hay eventos todavía).
 
 ## Pedido
 

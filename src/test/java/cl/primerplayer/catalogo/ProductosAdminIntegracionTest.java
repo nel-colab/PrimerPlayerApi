@@ -164,10 +164,13 @@ class ProductosAdminIntegracionTest {
                 .content(json("Juego sin código", "juegos-switch", segundo, null)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.codigoBarras").value(segundo));
 
-        // El vendedor sigue pudiendo editar el resto si reenvía el mismo código
+        // El vendedor sigue pudiendo proponer cambios al resto si reenvía el mismo código. El ADMIN publicó el
+        // producto (lo aprobó), así que la edición queda esperando aprobación y el producto no cambia todavía.
         como(vendedor, put(BASE + "/" + id).header(HttpHeaders.IF_MATCH, "2").contentType(MediaType.APPLICATION_JSON)
                 .content(json("Juego con código", "juegos-switch", segundo, null)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.nombre").value("Juego con código"));
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.nombre").value("Juego sin código"))
+                .andExpect(jsonPath("$.cambioPendiente").value(true));
     }
 
     @Test

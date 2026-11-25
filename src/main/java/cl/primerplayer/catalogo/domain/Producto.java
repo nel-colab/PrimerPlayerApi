@@ -8,6 +8,8 @@ import java.util.Objects;
 import cl.primerplayer.catalogo.api.CodigoBarrasInmutableException;
 import cl.primerplayer.catalogo.api.DatosProducto;
 import cl.primerplayer.catalogo.api.DatosProducto.ImagenProducto;
+import cl.primerplayer.catalogo.api.EstadoAprobacion;
+import cl.primerplayer.catalogo.api.ProductoNoAprobadoException;
 import cl.primerplayer.shared.api.LimiteSoloAdminException;
 import cl.primerplayer.shared.api.Rol;
 import cl.primerplayer.shared.api.ValidacionException;
@@ -15,6 +17,9 @@ import cl.primerplayer.shared.api.ValidacionException;
 /**
  * Agregado Producto. Modelo puro (sin JPA ni Spring). Inmutable: cada operación devuelve una copia.
  * El {@code stock} es de solo lectura aquí: lo escribe exclusivamente el módulo inventario.
+ *
+ * <p>Aprobación: solo un producto {@link EstadoAprobacion#APROBADO} puede estar publicado. Un VENDEDOR crea
+ * productos {@link EstadoAprobacion#PENDIENTE}; un ADMIN los aprueba ({@link #aprobar}) o rechaza.
  */
 public final class Producto {
 
@@ -28,9 +33,15 @@ public final class Producto {
     private final int version;
     private final Instant actualizadoEn;
     private final Instant eliminadoEn;
+    private final EstadoAprobacion aprobacion;
+    private final boolean cambioPendiente;
 
     private Producto(Long id, DatosProducto datos, int stock, int popularidad, LocalDate fechaIngreso, int version,
-                     Instant actualizadoEn, Instant eliminadoEn) {
+                     Instant actualizadoEn, Instant eliminadoEn, EstadoAprobacion aprobacion,
+                     boolean cambioPendiente) {
+        if (datos.publicado() && aprobacion != EstadoAprobacion.APROBADO) {
+            throw new ProductoNoAprobadoException();   // la base tiene el mismo CHECK como red final
+        }
         this.id = id;
         this.datos = Objects.requireNonNull(datos);
         this.stock = stock;
@@ -39,19 +50,30 @@ public final class Producto {
         this.version = version;
         this.actualizadoEn = actualizadoEn;
         this.eliminadoEn = eliminadoEn;
+        this.aprobacion = Objects.requireNonNull(aprobacion);
+        this.cambioPendiente = cambioPendiente;
     }
 
-    /** Producto nuevo: stock 0 (el stock inicial entra por un ajuste de inventario). */
-    public static Producto crear(DatosProducto datos, LocalDate hoy, Instant ahora) {
+    /**
+     * Producto nuevo: stock 0 (el stock inicial entra por un ajuste de inventario).
+     *
+     * @param requiereAprobacion lo crea un VENDEDOR: nace pendiente y sin publicar, pida lo que pida
+     */
+    public static Producto crear(DatosProducto datos, LocalDate hoy, Instant ahora, boolean requiereAprobacion) {
         DatosProducto limpios = normalizar(datos);
         validar(limpios);
-        return new Producto(null, limpios, 0, 0, hoy, 0, ahora, null);
+        if (requiereAprobacion) {
+            return new Producto(null, conPublicado(limpios, false), 0, 0, hoy, 0, ahora, null,
+                    EstadoAprobacion.PENDIENTE, false);
+        }
+        return new Producto(null, limpios, 0, 0, hoy, 0, ahora, null, EstadoAprobacion.APROBADO, false);
     }
 
     public static Producto reconstituir(Long id, DatosProducto datos, int stock, int popularidad,
                                         LocalDate fechaIngreso, int version, Instant actualizadoEn,
-                                        Instant eliminadoEn) {
-        return new Producto(id, datos, stock, popularidad, fechaIngreso, version, actualizadoEn, eliminadoEn);
+                                        Instant eliminadoEn, EstadoAprobacion aprobacion, boolean cambioPendiente) {
+        return new Producto(id, datos, stock, popularidad, fechaIngreso, version, actualizadoEn, eliminadoEn,
+                aprobacion, cambioPendiente);
     }
 
     /**
@@ -75,19 +97,60 @@ public final class Producto {
         if (limiteActual != null && !limiteActual.equals(limpios.limitePorCliente()) && rol != Rol.ADMIN) {
             throw new LimiteSoloAdminException();
         }
-        return new Producto(id, limpios, stock, popularidad, fechaIngreso, version, ahora, eliminadoEn);
+        return new Producto(id, limpios, stock, popularidad, fechaIngreso, version, ahora, eliminadoEn, aprobacion,
+                cambioPendiente);
     }
 
+    /**
+     * Valida un cambio sin aplicarlo, con las mismas reglas que {@link #actualizar} para el rol dado. Devuelve los
+     * datos normalizados, listos para guardarse como propuesta. No exige que el producto esté aprobado para publicar:
+     * eso lo decide quien aprueba.
+     */
+    public DatosProducto validarPropuesta(DatosProducto nuevos, Rol rol) {
+        DatosProducto propuestos = actualizar(conPublicado(nuevos, false), rol, actualizadoEn).datos();
+        return conPublicado(propuestos, nuevos.publicado());
+    }
+
+    /**
+     * @throws ProductoNoAprobadoException si se publica un producto no aprobado (un ADMIN llama antes a
+     *                                     {@link #aprobar})
+     */
     public Producto conPublicacion(boolean publicado, Instant ahora) {
-        DatosProducto d = datos;
-        DatosProducto nuevos = new DatosProducto(d.nombre(), d.descripcion(), d.precio(), d.categoria(), d.tipo(),
-                d.idioma(), d.marca(), d.plataforma(), d.franquicia(), d.linea(), d.codigoBarras(),
-                d.limitePorCliente(), publicado, d.imagenes());
-        return new Producto(id, nuevos, stock, popularidad, fechaIngreso, version, ahora, eliminadoEn);
+        return new Producto(id, conPublicado(datos, publicado), stock, popularidad, fechaIngreso, version, ahora,
+                eliminadoEn, aprobacion, cambioPendiente);
+    }
+
+    /** Autoriza el alta. No publica: quien aprueba lo publica después con {@link #conPublicacion}. */
+    public Producto aprobar(Instant ahora) {
+        return new Producto(id, datos, stock, popularidad, fechaIngreso, version, ahora, eliminadoEn,
+                EstadoAprobacion.APROBADO, cambioPendiente);
+    }
+
+    /** Alta rechazada: queda sin publicar hasta que el vendedor la corrija y vuelva a revisión. */
+    public Producto rechazar(Instant ahora) {
+        return new Producto(id, conPublicado(datos, false), stock, popularidad, fechaIngreso, version, ahora,
+                eliminadoEn, EstadoAprobacion.RECHAZADO, cambioPendiente);
+    }
+
+    /** Un alta rechazada que el vendedor corrigió vuelve a esperar aprobación (sin publicar). */
+    public Producto reenviarARevision(Instant ahora) {
+        return new Producto(id, conPublicado(datos, false), stock, popularidad, fechaIngreso, version, ahora,
+                eliminadoEn, EstadoAprobacion.PENDIENTE, cambioPendiente);
     }
 
     public Producto eliminar(Instant ahora) {
-        return new Producto(id, datos, stock, popularidad, fechaIngreso, version, ahora, ahora);
+        return new Producto(id, datos, stock, popularidad, fechaIngreso, version, ahora, ahora, aprobacion,
+                cambioPendiente);
+    }
+
+    public boolean aprobado() {
+        return aprobacion == EstadoAprobacion.APROBADO;
+    }
+
+    private static DatosProducto conPublicado(DatosProducto d, boolean publicado) {
+        return new DatosProducto(d.nombre(), d.descripcion(), d.precio(), d.categoria(), d.tipo(), d.idioma(),
+                d.marca(), d.plataforma(), d.franquicia(), d.linea(), d.codigoBarras(), d.limitePorCliente(),
+                publicado, d.imagenes());
     }
 
     private static DatosProducto normalizar(DatosProducto d) {
@@ -147,4 +210,6 @@ public final class Producto {
     public Instant actualizadoEn() { return actualizadoEn; }
     public Instant eliminadoEn() { return eliminadoEn; }
     public boolean eliminado() { return eliminadoEn != null; }
+    public EstadoAprobacion aprobacion() { return aprobacion; }
+    public boolean cambioPendiente() { return cambioPendiente; }
 }

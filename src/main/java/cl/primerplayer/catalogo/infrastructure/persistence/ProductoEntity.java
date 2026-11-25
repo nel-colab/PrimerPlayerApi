@@ -5,6 +5,8 @@ import java.time.LocalDate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -17,6 +19,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import cl.primerplayer.catalogo.api.EstadoAprobacion;
 
 /** Fila de {@code producto}. Catálogo lee {@code stock} pero nunca lo escribe (insertable/updatable = false). */
 @Entity
@@ -79,6 +83,11 @@ class ProductoEntity {
 
     @Column(nullable = false)
     private boolean publicado;
+
+    /** Estado del alta; CHECK en la base: solo APROBADO puede estar publicado. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 9)
+    private EstadoAprobacion aprobacion;
 
     @Version
     private int version;

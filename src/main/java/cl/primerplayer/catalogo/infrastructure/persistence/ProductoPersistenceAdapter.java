@@ -1,9 +1,14 @@
 package cl.primerplayer.catalogo.infrastructure.persistence;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -39,29 +44,36 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
 
     @Override
     public Optional<Producto> buscarActivo(long id) {
-        return productos.findByIdAndEliminadoEnIsNull(id)
-                .map(e -> aDominio(e, imagenesDe(imagenes.findByProductoIdOrderByPosicion(id))));
+        return productos.findByIdAndEliminadoEnIsNull(id).map(this::completo);
+    }
+
+    @Override
+    public Optional<Producto> buscarPorId(long id) {
+        return productos.findById(id).map(this::completo);
+    }
+
+    @Override
+    public Map<Long, Producto> buscarPorIds(Collection<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return enLote(productos.findAllById(ids)).stream()
+                .collect(Collectors.toMap(Producto::id, Function.identity()));
     }
 
     @Override
     public Optional<Producto> buscarPorCodigoBarras(String codigo) {
-        return productos.findByCodigoBarrasAndEliminadoEnIsNull(codigo)
-                .map(e -> aDominio(e, imagenesDe(imagenes.findByProductoIdOrderByPosicion(e.getId()))));
+        return productos.findByCodigoBarrasAndEliminadoEnIsNull(codigo).map(this::completo);
     }
 
     @Override
     public Optional<Producto> buscarPorNombreExacto(String nombre) {
-        return productos.findFirstByNombreIgnoreCaseAndEliminadoEnIsNullOrderByIdAsc(nombre)
-                .map(e -> aDominio(e, imagenesDe(imagenes.findByProductoIdOrderByPosicion(e.getId()))));
+        return productos.findFirstByNombreIgnoreCaseAndEliminadoEnIsNullOrderByIdAsc(nombre).map(this::completo);
     }
 
     @Override
     public List<Producto> todosActivos() {
-        List<ProductoEntity> filas = productos.findAllByEliminadoEnIsNullOrderByIdAsc();
-        List<Long> ids = filas.stream().map(ProductoEntity::getId).toList();
-        Map<Long, List<ImagenProducto>> imgs = ids.isEmpty() ? Map.of()
-                : resueltas.porProducto(imagenes.findByProductoIdIn(ids));
-        return filas.stream().map(e -> aDominio(e, imgs.getOrDefault(e.getId(), List.of()))).toList();
+        return enLote(productos.findAllByEliminadoEnIsNullOrderByIdAsc());
     }
 
     @Override
@@ -76,7 +88,7 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
             throw traducir(ex, p.datos().codigoBarras());
         }
         reemplazarImagenes(e.getId(), p.datos().imagenes());
-        return aDominio(e, imagenesDe(imagenes.findByProductoIdOrderByPosicion(e.getId())));   // URLs resueltas
+        return completo(e);   // URLs resueltas
     }
 
     @Override
@@ -97,7 +109,7 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
         if (!anteriores.equals(p.datos().imagenes())) {
             reemplazarImagenes(e.getId(), p.datos().imagenes());
         }
-        return aDominio(e, imagenesDe(imagenes.findByProductoIdOrderByPosicion(e.getId())));   // URLs resueltas
+        return completo(e);   // URLs resueltas
     }
 
     @Override
@@ -105,15 +117,7 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
         Sort sort = orden(f.orden());
         Page<ProductoEntity> page = productos.findAll(filtros.de(f, umbralStockBajo),
                 PageRequest.of(f.page(), f.size(), sort));
-
-        List<Long> ids = page.getContent().stream().map(ProductoEntity::getId).toList();
-        Map<Long, List<ImagenProducto>> imgs = ids.isEmpty() ? Map.of()
-                : resueltas.porProducto(imagenes.findByProductoIdIn(ids));   // URLs de archivos en una sola consulta
-
-        List<Producto> contenido = page.getContent().stream()
-                .map(e -> aDominio(e, imgs.getOrDefault(e.getId(), List.of())))
-                .toList();
-        return Pagina.de(contenido, f.page(), f.size(), page.getTotalElements());
+        return Pagina.de(enLote(page.getContent()), f.page(), f.size(), page.getTotalElements());
     }
 
     @Override
@@ -141,6 +145,7 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
         e.setCodigoBarras(d.codigoBarras());
         e.setLimitePorCliente(d.limitePorCliente());
         e.setPublicado(d.publicado());
+        e.setAprobacion(p.aprobacion());
         e.setActualizadoEn(p.actualizadoEn());
         e.setEliminadoEn(p.eliminadoEn());
     }
@@ -164,13 +169,32 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
         return resueltas.de(filas);
     }
 
-    private static Producto aDominio(ProductoEntity e, List<ImagenProducto> imagenes) {
+    /** Un producto con sus imágenes y si tiene una edición pendiente. */
+    private Producto completo(ProductoEntity e) {
+        boolean cambioPendiente = !productos.conEdicionPendiente(List.of(e.getId())).isEmpty();
+        return aDominio(e, imagenesDe(imagenes.findByProductoIdOrderByPosicion(e.getId())), cambioPendiente);
+    }
+
+    /** Varios productos: imágenes (URLs de archivos resueltas) y ediciones pendientes en una consulta cada una. */
+    private List<Producto> enLote(List<ProductoEntity> filas) {
+        if (filas.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = filas.stream().map(ProductoEntity::getId).toList();
+        Map<Long, List<ImagenProducto>> imgs = resueltas.porProducto(imagenes.findByProductoIdIn(ids));
+        Set<Long> conCambio = new HashSet<>(productos.conEdicionPendiente(ids));
+        return filas.stream()
+                .map(e -> aDominio(e, imgs.getOrDefault(e.getId(), List.of()), conCambio.contains(e.getId())))
+                .toList();
+    }
+
+    private static Producto aDominio(ProductoEntity e, List<ImagenProducto> imagenes, boolean cambioPendiente) {
         DatosProducto d = new DatosProducto(e.getNombre(), e.getDescripcion(), e.getPrecio(),
                 e.getCategoria().getSlug(), e.getTipo(), e.getIdioma(), e.getMarca(), e.getPlataforma(),
                 e.getFranquicia() == null ? null : e.getFranquicia().getNombre(), e.getLinea(), e.getCodigoBarras(),
                 e.getLimitePorCliente(), e.isPublicado(), imagenes);
         return Producto.reconstituir(e.getId(), d, e.getStock(), e.getPopularidad(), e.getFechaIngreso(),
-                e.getVersion(), e.getActualizadoEn(), e.getEliminadoEn());
+                e.getVersion(), e.getActualizadoEn(), e.getEliminadoEn(), e.getAprobacion(), cambioPendiente);
     }
 
     private static RuntimeException traducir(DataIntegrityViolationException ex, String codigo) {

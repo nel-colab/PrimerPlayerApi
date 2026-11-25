@@ -1,7 +1,9 @@
 package cl.primerplayer.catalogo.application.port.out;
 
-import java.util.Optional;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.FiltroProductos;
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase.IndicadoresProductos;
@@ -13,6 +15,12 @@ public interface ProductoRepositorio {
 
     /** Producto no eliminado. */
     Optional<Producto> buscarActivo(long id);
+
+    /** Incluye eliminados (historial de revisiones). */
+    Optional<Producto> buscarPorId(long id);
+
+    /** Productos (eliminados o no) por id, para armar vistas en lote. */
+    Map<Long, Producto> buscarPorIds(Collection<Long> ids);
 
     /** Producto no eliminado con ese código de barras exacto (único por índice parcial). */
     Optional<Producto> buscarPorCodigoBarras(String codigo);

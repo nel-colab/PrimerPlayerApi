@@ -33,6 +33,7 @@ Error `application/problem+json` (RFC 9457), siempre con `code`:
 | `payments-mismatch`, `receipt-required`, `transfer-proof-required`, `tcg-card-required`, `cash-change-mismatch` | 422 |
 | `barcode-taken`, `barcode-immutable`, `version-conflict`, `idempotency-conflict` | 409 |
 | `slot-taken`, `request-not-pending` | 409 |
+| `product-not-approved`, `review-not-pending`, `review-outdated` | 409 |
 | `google-email-mismatch`, `google-account-in-use` | 409 |
 | `google-unavailable` | 503 |
 | `precondition-required` (falta `If-Match`) | 428 |
@@ -109,10 +110,14 @@ calculadas sobre el resultado filtrado sin la propia faceta.
 | GET | `/admin/productos/exportar` | ADMIN | Array JSON con todos los productos activos o XLSX vía `Accept` / `format=excel` |
 | POST | `/admin/productos/importar` | ADMIN | `{filas:[...]}` JSON o multipart `archivo` XLSX/CSV; procesa filas individualmente, categoría (slug hoja) obligatoria para crear, reemplaza stock registrando ajuste |
 | GET | `/admin/productos/indicadores` | VENDEDOR | `{total, stockBajo, agotados}` |
-| POST | `/admin/productos` | VENDEDOR | `imagenes[{archivoId \| url, portada}]` |
-| PUT | `/admin/productos/{id}` | VENDEDOR | `If-Match: <version>`; código de barras y límite ya configurado: solo ADMIN los agrega/cambia |
-| PATCH | `/admin/productos/{id}/publicacion` | VENDEDOR | `{publicado}` |
-| DELETE | `/admin/productos/{id}` | VENDEDOR | borrado lógico |
+| POST | `/admin/productos` | VENDEDOR | `imagenes[{archivoId \| url, portada}]`; de VENDEDOR nace `aprobacion=PENDIENTE` sin publicar |
+| PUT | `/admin/productos/{id}` | VENDEDOR | `If-Match: <version>`; código de barras y límite ya configurado: solo ADMIN los agrega/cambia. VENDEDOR sobre producto `APROBADO` → **202** (queda en revisión, `cambioPendiente`) |
+| PATCH | `/admin/productos/{id}/publicacion` | VENDEDOR | `{publicado}`; ocultar directo; publicar de VENDEDOR → 202 o 409 `product-not-approved` |
+| DELETE | `/admin/productos/{id}` | VENDEDOR | borrado lógico; descarta su revisión pendiente |
+| GET | `/admin/productos/revisiones` | VENDEDOR | bandeja: `estado` = PENDIENTE (defecto) \| APROBADA \| RECHAZADA \| DESCARTADA \| todas; más antiguas primero |
+| GET | `/admin/productos/{id}/revisiones` | VENDEDOR | historial del producto, más reciente primero |
+| POST | `/admin/productos/revisiones/{id}/aprobacion` | ADMIN | ALTA: aprueba y publica; EDICION: aplica lo propuesto. 409 `review-not-pending`, `review-outdated` |
+| POST | `/admin/productos/revisiones/{id}/rechazo` | ADMIN | `{motivo}` obligatorio. 409 `review-not-pending` |
 | POST | `/admin/inventario/{productoId}/ajustes` | VENDEDOR | `{delta, motivo}` → `{stock}` |
 | GET | `/admin/inventario/{productoId}/movimientos` | VENDEDOR | kardex paginado |
 | GET/PUT | `/admin/inventario/configuracion` | ADMIN | `{umbralStockBajo}` |

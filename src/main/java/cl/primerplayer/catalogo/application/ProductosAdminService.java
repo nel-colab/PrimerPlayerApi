@@ -1,8 +1,10 @@
 package cl.primerplayer.catalogo.application;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -14,13 +16,15 @@ import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase;
 import cl.primerplayer.catalogo.api.DatosProducto;
 import cl.primerplayer.catalogo.api.ProductoAdmin;
 import cl.primerplayer.catalogo.api.UmbralStockBajo;
-import cl.primerplayer.catalogo.application.port.out.MaestrosCatalogoRepositorio;
+import cl.primerplayer.catalogo.api.ProductoNoAprobadoException;
+import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.EstadoRevision;
+import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.TipoRevision;
 import cl.primerplayer.catalogo.application.port.out.ProductoRepositorio;
+import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio;
+import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio.Revision;
 import cl.primerplayer.catalogo.domain.Producto;
 import cl.primerplayer.shared.api.Pagina;
 import cl.primerplayer.shared.api.RecursoNoEncontradoException;
-import cl.primerplayer.shared.api.Rol;
-import cl.primerplayer.shared.api.ValidacionException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -31,46 +35,127 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
     private static final java.time.ZoneId ZONA_TIENDA = java.time.ZoneId.of("America/Santiago");
 
     private final ProductoRepositorio productos;
-    private final MaestrosCatalogoRepositorio maestros;
+    private final RevisionRepositorio revisiones;
+    private final ReferenciasProducto referencias;
     private final UmbralStockBajo umbral;
-    private final cl.primerplayer.media.api.ArchivosUseCase media;
     private final Clock clock;
 
     // ---------- comandos ----------
 
     @Override
     @Transactional
-    public ProductoAdmin crear(DatosProducto datos) {
-        validarReferencias(datos);
+    public ProductoAdmin crear(DatosProducto datos, Actor actor) {
+        referencias.validar(datos);
         var ahora = clock.instant();
-        Producto nuevo = Producto.crear(datos, LocalDate.ofInstant(ahora, ZONA_TIENDA), ahora);
-        return ProductosAdmin.de(productos.guardarNuevo(nuevo));
+        boolean requiereAprobacion = !actor.esAdmin();
+        Producto nuevo = productos.guardarNuevo(
+                Producto.crear(datos, LocalDate.ofInstant(ahora, ZONA_TIENDA), ahora, requiereAprobacion));
+        if (requiereAprobacion) {
+            revisiones.crear(nuevo.id(), TipoRevision.ALTA, null, nuevo.version(), actor.usuarioId(), ahora);
+        }
+        return ProductosAdmin.de(nuevo);
     }
 
     @Override
     @Transactional
-    public ProductoAdmin actualizar(long id, int versionEsperada, DatosProducto datos, Rol rol) {
+    public ResultadoCambio actualizar(long id, int versionEsperada, DatosProducto datos, Actor actor) {
         Producto actual = activo(id);
         if (actual.version() != versionEsperada) {
             throw new ConflictoVersionException();
         }
-        validarReferencias(datos);
-        Producto cambiado = actual.actualizar(datos, rol, clock.instant());
-        return ProductosAdmin.de(productos.actualizar(cambiado, versionEsperada));
+        referencias.validar(datos);
+        var ahora = clock.instant();
+
+        if (actor.esAdmin()) {
+            // Un ADMIN que publica un producto no aprobado lo está autorizando.
+            Producto base = datos.publicado() && !actual.aprobado() ? actual.aprobar(ahora) : actual;
+            Producto guardado = productos.actualizar(base.actualizar(datos, actor.rol(), ahora), versionEsperada);
+            if (guardado.aprobado() && !actual.aprobado()) {
+                cerrarAltaPendiente(id, EstadoRevision.APROBADA, actor, ahora);
+            }
+            return new ResultadoCambio(ProductosAdmin.de(guardado), false);
+        }
+
+        if (!actual.aprobado()) {
+            // Alta aún no autorizada: no está a la venta, así que el vendedor la corrige directo (sin publicar).
+            Producto cambiado = actual.actualizar(ProductosAdmin.conPublicado(datos, false), actor.rol(), ahora)
+                    .reenviarARevision(ahora);
+            Producto guardado = productos.actualizar(cambiado, versionEsperada);
+            if (revisiones.pendienteDe(id).isEmpty()) {   // estaba rechazada: vuelve a la bandeja
+                revisiones.crear(id, TipoRevision.ALTA, null, guardado.version(), actor.usuarioId(), ahora);
+            }
+            return new ResultadoCambio(ProductosAdmin.de(guardado), false);
+        }
+
+        // Producto aprobado (a la venta): el cambio queda como propuesta; sigue vendiéndose con lo aprobado.
+        DatosProducto propuestos = actual.validarPropuesta(datos, actor.rol());
+        return proponer(actual, propuestos, actor, ahora);
     }
 
     @Override
     @Transactional
-    public ProductoAdmin cambiarPublicacion(long id, boolean publicado) {
+    public ResultadoCambio cambiarPublicacion(long id, boolean publicado, Actor actor) {
         Producto actual = activo(id);
-        return ProductosAdmin.de(productos.actualizar(actual.conPublicacion(publicado, clock.instant()), actual.version()));
+        var ahora = clock.instant();
+        if (!publicado || actual.datos().publicado() == publicado) {
+            // Ocultar nunca espera aprobación: sacar algo de la venta es la dirección segura.
+            Producto guardado = actual.datos().publicado() == publicado ? actual
+                    : productos.actualizar(actual.conPublicacion(false, ahora), actual.version());
+            return new ResultadoCambio(ProductosAdmin.de(guardado), false);
+        }
+
+        if (actor.esAdmin()) {
+            Producto base = actual.aprobado() ? actual : actual.aprobar(ahora);
+            Producto guardado = productos.actualizar(base.conPublicacion(true, ahora), actual.version());
+            if (!actual.aprobado()) {
+                cerrarAltaPendiente(id, EstadoRevision.APROBADA, actor, ahora);
+            }
+            return new ResultadoCambio(ProductosAdmin.de(guardado), false);
+        }
+
+        if (!actual.aprobado()) {
+            throw new ProductoNoAprobadoException();   // se publicará cuando un ADMIN apruebe el alta
+        }
+        // Republicar un producto aprobado: propuesta sobre lo que ya estaba propuesto (si había) o sobre lo actual.
+        DatosProducto base = revisiones.pendienteDe(id).map(Revision::propuesto).filter(Objects::nonNull)
+                .orElse(actual.datos());
+        return proponer(actual, ProductosAdmin.conPublicado(base, true), actor, ahora);
     }
 
     @Override
     @Transactional
-    public void eliminar(long id) {
+    public void eliminar(long id, Actor actor) {
         Producto actual = activo(id);
-        productos.actualizar(actual.eliminar(clock.instant()), actual.version());
+        var ahora = clock.instant();
+        productos.actualizar(actual.eliminar(ahora), actual.version());
+        revisiones.pendienteDe(id).ifPresent(r ->
+                revisiones.resolver(r.id(), EstadoRevision.DESCARTADA, null, actor.usuarioId(), ahora));
+    }
+
+    /**
+     * Guarda (o reemplaza) la propuesta pendiente del producto. Si lo propuesto es igual a lo aprobado, no hay nada
+     * que revisar: se descarta la propuesta que hubiera.
+     */
+    private ResultadoCambio proponer(Producto actual, DatosProducto propuestos, Actor actor, Instant ahora) {
+        long id = actual.id();
+        var pendiente = revisiones.pendienteDe(id);
+        if (ProductosAdmin.mismosDatos(propuestos, actual.datos())) {
+            pendiente.ifPresent(r ->
+                    revisiones.resolver(r.id(), EstadoRevision.DESCARTADA, null, actor.usuarioId(), ahora));
+            return new ResultadoCambio(ProductosAdmin.de(activo(id)), false);
+        }
+        if (pendiente.isPresent()) {
+            revisiones.reemplazarPropuesta(pendiente.get().id(), propuestos, actual.version(), actor.usuarioId(), ahora);
+        } else {
+            revisiones.crear(id, TipoRevision.EDICION, propuestos, actual.version(), actor.usuarioId(), ahora);
+        }
+        return new ResultadoCambio(ProductosAdmin.de(activo(id)), true);
+    }
+
+    private void cerrarAltaPendiente(long productoId, EstadoRevision estado, Actor actor, Instant ahora) {
+        revisiones.pendienteDe(productoId)
+                .filter(r -> r.tipo() == TipoRevision.ALTA)
+                .ifPresent(r -> revisiones.resolver(r.id(), estado, null, actor.usuarioId(), ahora));
     }
 
     // ---------- consultas ----------
@@ -133,23 +218,5 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
     private Producto activo(long id) {
         return productos.buscarActivo(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("El producto " + id + " no existe."));
-    }
-
-    private void validarReferencias(DatosProducto datos) {
-        Boolean hoja = maestros.categoriaEsHoja(datos.categoria().strip())
-                .orElseThrow(() -> new ValidacionException("categoria", "La categoría no existe."));
-        if (!hoja) {
-            throw new ValidacionException("categoria", "La categoría debe ser una hoja, no una agrupadora.");
-        }
-        if (datos.franquicia() != null && !datos.franquicia().isBlank()
-                && !maestros.existeFranquicia(datos.franquicia().strip())) {
-            throw new ValidacionException("franquicia", "La franquicia no existe.");
-        }
-        // Una imagen subida debe existir y ser pública: un comprobante privado nunca puede quedar como foto.
-        for (var img : datos.imagenes()) {
-            if (img.archivoId() != null && !media.esImagenPublica(img.archivoId())) {
-                throw new ValidacionException("imagenes", "La imagen subida no existe o no es una imagen pública.");
-            }
-        }
     }
 }

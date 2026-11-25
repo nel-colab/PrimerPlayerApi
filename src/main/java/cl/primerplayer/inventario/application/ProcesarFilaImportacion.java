@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import cl.primerplayer.catalogo.api.AdministrarProductosUseCase;
+import cl.primerplayer.catalogo.api.AdministrarProductosUseCase.Actor;
 import cl.primerplayer.catalogo.api.ConsultarProductosAdminUseCase;
 import cl.primerplayer.catalogo.api.DatosProducto;
 import cl.primerplayer.catalogo.api.ProductoAdmin;
@@ -29,9 +30,11 @@ class ProcesarFilaImportacion {
     public Resultado procesar(FilaImportacion fila, long usuarioId) {
         ProductoAdmin existente = buscarExistente(fila);
         DatosProducto datos = datos(fila, existente);
+        // La importación es solo para ADMIN (ImportarProductosController): lo que carga queda aprobado.
+        var actor = new Actor(usuarioId, Rol.ADMIN);
         ProductoAdmin guardado = existente == null
-                ? administrar.crear(datos)
-                : administrar.actualizar(existente.id(), existente.version(), datos, Rol.ADMIN);
+                ? administrar.crear(datos, actor)
+                : administrar.actualizar(existente.id(), existente.version(), datos, actor).producto();
         stock.reemplazar(new ReemplazoStock(guardado.id(), valor(fila.stock()), MOTIVO, usuarioId));
         return existente == null ? Resultado.CREADO : Resultado.ACTUALIZADO;
     }

@@ -14,6 +14,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import cl.primerplayer.catalogo.api.CodigoBarrasInmutableException;
 import cl.primerplayer.catalogo.api.DatosProducto;
 import cl.primerplayer.catalogo.api.DatosProducto.ImagenProducto;
+import cl.primerplayer.catalogo.api.EstadoAprobacion;
+import cl.primerplayer.catalogo.api.ProductoNoAprobadoException;
 import cl.primerplayer.shared.api.LimiteSoloAdminException;
 import cl.primerplayer.shared.api.Rol;
 import cl.primerplayer.shared.api.ValidacionException;
@@ -29,8 +31,9 @@ class ProductoTest {
     }
 
     static Producto existente(String codigo, Integer limite) {
-        Producto p = Producto.crear(datos(codigo, limite, List.of()), LocalDate.of(2026, 11, 11), AHORA);
-        return Producto.reconstituir(1L, p.datos(), 5, 0, p.fechaIngreso(), 3, AHORA, null);
+        Producto p = Producto.crear(datos(codigo, limite, List.of()), LocalDate.of(2026, 11, 11), AHORA, false);
+        return Producto.reconstituir(1L, p.datos(), 5, 0, p.fechaIngreso(), 3, AHORA, null,
+                EstadoAprobacion.APROBADO, false);
     }
 
     // ---------- código de barras ----------
@@ -49,7 +52,7 @@ class ProductoTest {
 
     @Test
     void crear_normalizaYValida() {
-        Producto p = Producto.crear(datos("", null, List.of()), LocalDate.of(2026, 11, 11), AHORA);
+        Producto p = Producto.crear(datos("", null, List.of()), LocalDate.of(2026, 11, 11), AHORA, false);
         assertThat(p.datos().nombre()).isEqualTo("Sobre Black Bolt");
         assertThat(p.datos().codigoBarras()).isNull();
         assertThat(p.datos().descripcion()).isNull();
@@ -58,7 +61,7 @@ class ProductoTest {
 
     @Test
     void crear_conCodigoConVerificadorMalo_validation() {
-        assertThatThrownBy(() -> Producto.crear(datos("7801234567891", null, List.of()), LocalDate.now(), AHORA))
+        assertThatThrownBy(() -> Producto.crear(datos("7801234567891", null, List.of()), LocalDate.now(), AHORA, false))
                 .isInstanceOf(ValidacionException.class);
     }
 
@@ -116,17 +119,70 @@ class ProductoTest {
     void imagenes_exactamenteUnaPortadaMaximoCincoYSoloHttps() {
         var ok = new ImagenProducto("https://cdn.test/a.webp", true);
         var otra = new ImagenProducto("https://cdn.test/b.webp", false);
-        Producto.crear(datos(null, null, List.of(ok, otra)), LocalDate.now(), AHORA);
+        Producto.crear(datos(null, null, List.of(ok, otra)), LocalDate.now(), AHORA, false);
 
-        assertThatThrownBy(() -> Producto.crear(datos(null, null, List.of(otra)), LocalDate.now(), AHORA))
+        assertThatThrownBy(() -> Producto.crear(datos(null, null, List.of(otra)), LocalDate.now(), AHORA, false))
                 .isInstanceOf(ValidacionException.class);
-        assertThatThrownBy(() -> Producto.crear(datos(null, null, List.of(ok, ok)), LocalDate.now(), AHORA))
-                .isInstanceOf(ValidacionException.class);
-        assertThatThrownBy(() -> Producto.crear(datos(null, null,
-                List.of(ok, otra, otra, otra, otra, otra)), LocalDate.now(), AHORA))
+        assertThatThrownBy(() -> Producto.crear(datos(null, null, List.of(ok, ok)), LocalDate.now(), AHORA, false))
                 .isInstanceOf(ValidacionException.class);
         assertThatThrownBy(() -> Producto.crear(datos(null, null,
-                List.of(new ImagenProducto("http://cdn.test/a.webp", true))), LocalDate.now(), AHORA))
+                List.of(ok, otra, otra, otra, otra, otra)), LocalDate.now(), AHORA, false))
                 .isInstanceOf(ValidacionException.class);
+        assertThatThrownBy(() -> Producto.crear(datos(null, null,
+                List.of(new ImagenProducto("http://cdn.test/a.webp", true))), LocalDate.now(), AHORA, false))
+                .isInstanceOf(ValidacionException.class);
+    }
+
+    // ---------- aprobación ----------
+
+    static DatosProducto publicado() {
+        return new DatosProducto("Sobre", null, 4990, "tcg-pokemon", null, null, null, null, null, null, null, null,
+                true, List.of());
+    }
+
+    @Test
+    void crear_porVendedor_nacePendienteYSinPublicarAunquePidaPublicar() {
+        Producto p = Producto.crear(publicado(), LocalDate.of(2026, 11, 11), AHORA, true);
+        assertThat(p.aprobacion()).isEqualTo(EstadoAprobacion.PENDIENTE);
+        assertThat(p.datos().publicado()).isFalse();
+    }
+
+    @Test
+    void crear_porAdmin_naceAprobadoYComoLoPidio() {
+        Producto p = Producto.crear(publicado(), LocalDate.of(2026, 11, 11), AHORA, false);
+        assertThat(p.aprobacion()).isEqualTo(EstadoAprobacion.APROBADO);
+        assertThat(p.datos().publicado()).isTrue();
+    }
+
+    @Test
+    void publicarSinAprobar_productNotApproved_yAprobarLoPermite() {
+        Producto pendiente = Producto.crear(publicado(), LocalDate.of(2026, 11, 11), AHORA, true);
+        assertThatThrownBy(() -> pendiente.conPublicacion(true, AHORA))
+                .isInstanceOf(ProductoNoAprobadoException.class);
+
+        Producto aprobado = pendiente.aprobar(AHORA).conPublicacion(true, AHORA);
+        assertThat(aprobado.aprobacion()).isEqualTo(EstadoAprobacion.APROBADO);
+        assertThat(aprobado.datos().publicado()).isTrue();
+    }
+
+    @Test
+    void rechazar_dejaSinPublicar_yReenviarVuelveAPendiente() {
+        Producto pendiente = Producto.crear(publicado(), LocalDate.of(2026, 11, 11), AHORA, true);
+        Producto rechazado = pendiente.rechazar(AHORA);
+        assertThat(rechazado.aprobacion()).isEqualTo(EstadoAprobacion.RECHAZADO);
+        assertThat(rechazado.reenviarARevision(AHORA).aprobacion()).isEqualTo(EstadoAprobacion.PENDIENTE);
+    }
+
+    @Test
+    void validarPropuesta_aplicaLasReglasDelVendedorSinCambiarElProducto() {
+        Producto p = existente(EAN, 2);
+        assertThatThrownBy(() -> p.validarPropuesta(datos(null, 2, List.of()), Rol.VENDEDOR))
+                .isInstanceOf(CodigoBarrasInmutableException.class);
+        assertThatThrownBy(() -> p.validarPropuesta(datos(EAN, 9, List.of()), Rol.VENDEDOR))
+                .isInstanceOf(LimiteSoloAdminException.class);
+
+        DatosProducto propuesto = p.validarPropuesta(datos(EAN, 2, List.of()), Rol.VENDEDOR);
+        assertThat(propuesto.nombre()).isEqualTo("Sobre Black Bolt");   // normalizado
+        assertThat(p.datos().descripcion()).isNull();                   // el producto no cambia
     }
 }
