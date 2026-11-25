@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--/*
+  Plantilla única de los correos de Primer Player (Thymeleaf). Reglas:
+  - Sin URLs, enlaces ni botones: ningún <a href>. Los logos van incrustados (cid:) y no son clickeables.
+  - HTML de correo: tablas, estilos en línea, ancho máximo 560 px, todo centrado. Nada de CSS externo ni JavaScript.
+  - Todo el texto con th:text (escapado): los nombres de productos los escriben vendedores.
+  Variable: m (MensajeCorreo).
+*/-->
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <!-- Diseño oscuro propio: los clientes no deben invertir los colores. Sin detección de teléfonos/direcciones. -->
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+  <title th:text="${m.asuntoCompleto()}">Primer Player</title>
+  <style>
+    a[x-apple-data-detectors], u + #cuerpo a, #MessageViewBody a {
+      color: inherit !important; text-decoration: none !important; pointer-events: none !important;
+      font: inherit !important;
+    }
+    @media (max-width: 600px) {
+      .contenedor { width: 100% !important; }
+      .relleno { padding-left: 22px !important; padding-right: 22px !important; }
+      .codigo { font-size: 30px !important; letter-spacing: 6px !important; }
+    }
+  </style>
+</head>
+<body id="cuerpo" style="margin:0; padding:0; background-color:#0d0718; -webkit-text-size-adjust:100%;">
+  <!-- Preencabezado: lo que se ve junto al asunto en la bandeja de entrada -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:#0d0718; font-size:1px; line-height:1px;"
+       th:text="${m.preencabezado()}">Resumen</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0d0718"
+         style="background-color:#0d0718;">
+    <tr>
+      <td align="center" style="padding:28px 12px;">
+
+        <table role="presentation" class="contenedor" width="560" cellpadding="0" cellspacing="0" border="0"
+               style="width:560px; max-width:560px;">
+
+          <!-- Marca -->
+          <tr>
+            <td align="center" style="padding:6px 0 18px 0;">
+              <img src="cid:logo-pp" width="110" height="73" alt="Primer Player"
+                   style="display:block; margin:0 auto; border:0; outline:none; width:110px; height:73px;">
+              <img src="cid:logo-letras" width="220" height="42" alt=""
+                   style="display:block; margin:12px auto 0 auto; border:0; outline:none; width:220px; height:42px;">
+            </td>
+          </tr>
+
+          <!-- Tarjeta -->
+          <tr>
+            <td bgcolor="#1b0a38"
+                style="background-color:#1b0a38; border:1px solid #3a1d6b; border-top:4px solid #c9a227; border-radius:14px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+                <tr>
+                  <td class="relleno" align="center" style="padding:34px 40px 8px 40px;">
+                    <h1 style="margin:0; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:24px;
+                               line-height:32px; font-weight:800; color:#f1c75b; text-align:center;"
+                        th:text="${m.titulo()}">Título</h1>
+                  </td>
+                </tr>
+
+                <tr th:if="${m.saludo() != null}">
+                  <td class="relleno" align="center"
+                      style="padding:18px 40px 0 40px; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                             font-size:17px; line-height:26px; font-weight:600; color:#ffffff; text-align:center;"
+                      th:text="${m.saludo()}">Hola:</td>
+                </tr>
+
+                <tr th:each="p : ${m.parrafos()}">
+                  <td class="relleno" align="center"
+                      style="padding:14px 40px 0 40px; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                             font-size:16px; line-height:25px; color:#d9cdf2; text-align:center;"
+                      th:text="${p}">Párrafo</td>
+                </tr>
+
+                <!-- Bloque destacado: código, total o precio -->
+                <tr th:if="${m.destacado() != null}">
+                  <td class="relleno" align="center" style="padding:26px 40px 4px 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"
+                           style="margin:0 auto;">
+                      <tr>
+                        <td align="center" bgcolor="#2a1157"
+                            style="background-color:#2a1157; border:1px solid #c9a227; border-radius:12px;
+                                   padding:18px 34px 20px 34px;">
+                          <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px;
+                                      line-height:16px; letter-spacing:2px; text-transform:uppercase; color:#b9a8d9;"
+                               th:text="${m.destacado().etiqueta()}">Etiqueta</div>
+                          <div th:class="${m.destacado().esCodigo()} ? 'codigo' : null"
+                               th:style="${m.destacado().esCodigo()}
+                                 ? 'margin-top:8px; font-family:Consolas,Menlo,Courier New,monospace; font-size:38px; line-height:46px; font-weight:700; letter-spacing:10px; color:#f1c75b;'
+                                 : 'margin-top:6px; font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:30px; line-height:38px; font-weight:800; color:#f1c75b;'"
+                               th:text="${m.destacado().valor()}">000000</div>
+                          <div th:if="${m.destacado().pie() != null}"
+                               style="margin-top:8px; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                                      font-size:13px; line-height:18px; color:#b9a8d9;"
+                               th:text="${m.destacado().pie()}">Vence en 24 horas</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Detalles: filas etiqueta / valor -->
+                <tr th:if="${!m.detalles().isEmpty()}">
+                  <td class="relleno" align="center" style="padding:24px 40px 0 40px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                           style="border-collapse:collapse;">
+                      <tr th:each="d, it : ${m.detalles()}">
+                        <td th:style="'padding:10px 8px; border-top:' + (${it.first} ? '0' : '1px solid #3a1d6b')
+                                      + '; font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; line-height:20px; color:#b9a8d9; text-align:left;'"
+                            th:text="${d.etiqueta()}">Etiqueta</td>
+                        <td th:style="'padding:10px 8px; border-top:' + (${it.first} ? '0' : '1px solid #3a1d6b')
+                                      + '; font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; line-height:20px; font-weight:600; color:#ffffff; text-align:right;'"
+                            th:text="${d.valor()}">Valor</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Pasos numerados -->
+                <tr th:if="${!m.pasos().isEmpty()}">
+                  <td class="relleno" align="center" style="padding:24px 40px 0 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"
+                           style="margin:0 auto;">
+                      <tr th:each="paso, it : ${m.pasos()}">
+                        <td valign="top" style="padding:6px 10px 6px 0;">
+                          <div style="width:24px; height:24px; border-radius:12px; background-color:#c9a227;
+                                      font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px;
+                                      line-height:24px; font-weight:800; color:#1b0a38; text-align:center;"
+                               th:text="${it.count}">1</div>
+                        </td>
+                        <td valign="top"
+                            style="padding:7px 0; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                                   font-size:15px; line-height:22px; color:#d9cdf2; text-align:left;"
+                            th:text="${paso}">Paso</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr th:if="${m.nota() != null}">
+                  <td class="relleno" align="center"
+                      style="padding:26px 40px 0 40px; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                             font-size:13px; line-height:20px; color:#9c8cbf; text-align:center;"
+                      th:text="${m.nota()}">Nota</td>
+                </tr>
+
+                <tr><td style="padding:0 0 34px 0; font-size:0; line-height:0;">&nbsp;</td></tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Pie -->
+          <tr>
+            <td align="center"
+                style="padding:22px 20px 6px 20px; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                       font-size:12px; line-height:18px; color:#7d6ba3; text-align:center;">
+              <span style="color:#c9a227; font-weight:700;">Primer Player</span> · Cultura pop, TCG y videojuegos ·
+              San Bernardo<br>
+              Este es un correo automático: no es necesario responderlo.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

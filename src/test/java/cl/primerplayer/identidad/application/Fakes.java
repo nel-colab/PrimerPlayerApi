@@ -152,7 +152,7 @@ final class Fakes {
             for (int i = 0; i < guardados.size(); i++) {
                 TokenUnUso t = guardados.get(i);
                 if (t.usuarioId() == usuarioId && t.tipo() == tipo && t.expiraEn().isAfter(ahora)) {
-                    guardados.set(i, new TokenUnUso(t.id(), t.usuarioId(), t.tipo(), t.tokenHash(), ahora));
+                    guardados.set(i, new TokenUnUso(t.id(), t.usuarioId(), t.tipo(), t.tokenHash(), t.creadoEn(), ahora));
                     n++;
                 }
             }

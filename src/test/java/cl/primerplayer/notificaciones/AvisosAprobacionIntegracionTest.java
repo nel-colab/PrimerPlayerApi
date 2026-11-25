@@ -57,7 +57,7 @@ class AvisosAprobacionIntegracionTest {
 
     static String json(String nombre, long precio, String descripcion, boolean publicado) {
         return """
-            {"nombre":"%s","precio":%d,"categoria":"tcg-pokemon","descripcion":"%s","publicado":%s}
+            {"nombre":"%s","precio":%d,"categoria":"tcg","descripcion":"%s","publicado":%s}
             """.formatted(nombre, precio, descripcion, publicado);
     }
 
@@ -95,7 +95,8 @@ class AvisosAprobacionIntegracionTest {
         assertThat(correo.texto())
                 .contains("Prueba VENDEDOR")
                 .contains("$12.990")
-                .contains("/admin/aprobaciones");
+                .contains("Aprobación de productos")
+                .doesNotContain("http");
     }
 
     @Test

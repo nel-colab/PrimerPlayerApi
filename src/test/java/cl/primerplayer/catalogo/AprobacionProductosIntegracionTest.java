@@ -65,7 +65,7 @@ class AprobacionProductosIntegracionTest {
 
     static String json(String nombre, long precio, String codigo, boolean publicado) {
         return """
-            {"nombre":"%s","precio":%d,"categoria":"tcg-pokemon","codigoBarras":%s,"publicado":%s,
+            {"nombre":"%s","precio":%d,"categoria":"tcg","codigoBarras":%s,"publicado":%s,
              "imagenes":[{"url":"https://cdn.test/a.webp","portada":true}]}
             """.formatted(nombre, precio, codigo == null ? "null" : "\"" + codigo + "\"", publicado);
     }
@@ -282,6 +282,82 @@ class AprobacionProductosIntegracionTest {
                 .andExpect(jsonPath("$.actual.precio").value(4990))
                 .andExpect(jsonPath("$.actual.aprobacion").value("APROBADO"))
                 .andExpect(jsonPath("$.actual.cambioPendiente").value(false));
+    }
+
+    // ---------- aprobar con cambios ----------
+
+    private ResultActions aprobarConCambios(long revision, String datos, int version) throws Exception {
+        return como(admin, post(REVISIONES + "/" + revision + "/aprobacion").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"datos\":" + datos + ",\"version\":" + version + "}"));
+    }
+
+    @Test
+    void altaAprobadaConCambios_quedaComoLaDejoElAdmin_yElHistorialGuardaAmbasVersiones() throws Exception {
+        String n = nombre();
+        long id = crear(vendedor, json(n, 4990, null, true));
+        long rev = pendiente(id);
+
+        aprobarConCambios(rev, json(n + " (corregido)", 5990, null, true), 0)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("APROBADA"))
+                .andExpect(jsonPath("$.actual.nombre").value(n + " (corregido)"))
+                .andExpect(jsonPath("$.actual.precio").value(5990))
+                .andExpect(jsonPath("$.actual.aprobacion").value("APROBADO"))
+                .andExpect(jsonPath("$.actual.publicado").value(true))
+                .andExpect(jsonPath("$.aprobado.precio").value(5990));
+        mvc.perform(get("/api/v1/productos/" + id)).andExpect(jsonPath("$.precio").value(5990));
+    }
+
+    @Test
+    void edicionAprobadaConCambios_aplicaLoDelAdmin_yConservaLoPropuesto() throws Exception {
+        String n = nombre();
+        long id = crear(admin, json(n, 4990, null, true));
+        putComo(vendedor, id, 0, json(n, 5990, null, true)).andExpect(status().isAccepted());
+
+        aprobarConCambios(pendiente(id), json(n, 5490, null, true), 0)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.actual.precio").value(5490))
+                .andExpect(jsonPath("$.propuesto.precio").value(5990))
+                .andExpect(jsonPath("$.aprobado.precio").value(5490))
+                .andExpect(jsonPath("$.actual.cambioPendiente").value(false));
+        // Aprobar tal cual no guarda "aprobado"
+        long otro = crear(admin, json(nombre(), 4990, null, true));
+        putComo(vendedor, otro, 0, json(nombre(), 4990, null, true)).andExpect(status().isAccepted());
+        como(admin, post(REVISIONES + "/" + pendiente(otro) + "/aprobacion"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.aprobado").doesNotExist());
+    }
+
+    @Test
+    void edicionDesactualizada_sePuedeAprobarConCambiosSobreLaVersionActual() throws Exception {
+        String n = nombre();
+        long id = crear(admin, json(n, 4990, null, true));
+        putComo(vendedor, id, 0, json(n, 5990, null, true)).andExpect(status().isAccepted());
+        long rev = pendiente(id);
+        putComo(admin, id, 0, json(n + " v2", 4990, null, true)).andExpect(status().isOk());   // versión 1
+
+        aprobarConCambios(rev, json(n + " v2", 5990, null, true), 0)   // corrigió mirando la versión vieja
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("version-conflict"));
+        aprobarConCambios(rev, json(n + " v2", 5990, null, true), 1)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.actual.nombre").value(n + " v2"))
+                .andExpect(jsonPath("$.actual.precio").value(5990));
+    }
+
+    @Test
+    void aprobarConCambios_reglasDeAdmin_yValidaElCuerpo() throws Exception {
+        long id = crear(vendedor, json(nombre(), 4990, null, false));
+        long rev = pendiente(id);
+        String ean = TokensDePrueba.ean13();
+
+        aprobarConCambios(rev, "{\"nombre\":\"\",\"precio\":-1}", 0).andExpect(status().isBadRequest());
+        como(admin, post(REVISIONES + "/" + rev + "/aprobacion").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"datos\":" + json(nombre(), 4990, null, true) + "}")).andExpect(status().isBadRequest());
+        // El ADMIN sí puede poner el código de barras al aprobar; y puede dejarlo sin publicar
+        aprobarConCambios(rev, json(nombre(), 4990, ean, false), 0)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.actual.codigoBarras").value(ean))
+                .andExpect(jsonPath("$.actual.aprobacion").value("APROBADO"))
+                .andExpect(jsonPath("$.actual.publicado").value(false));
     }
 
     // ---------- publicación ----------

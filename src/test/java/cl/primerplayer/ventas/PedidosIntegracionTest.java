@@ -70,7 +70,7 @@ class PedidosIntegracionTest {
         prefijo = "T" + UUID.randomUUID().toString().substring(0, 6).toUpperCase() + "-";
         productoId = jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id, publicado)
-                VALUES ('Sobre de prueba', 4990, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'), true) RETURNING id
+                VALUES ('Sobre de prueba', 4990, (SELECT id FROM categoria WHERE slug = 'tcg'), true) RETURNING id
                 """, Long.class);
         eventoId = jdbc.queryForObject("""
                 INSERT INTO evento (titulo, tipo, fecha_hora, lugar, precio, cupos_totales, descripcion, publicado)
@@ -250,7 +250,7 @@ class PedidosIntegracionTest {
                 .filter(c -> c.asunto().contains("está listo para retirar")).findFirst().orElseThrow();
         assertThat(correo.asunto()).contains(codigo);
         assertThat(correo.texto()).contains(codigo, "Torneo de prueba", "Av. Portales Ote. 1126, San Bernardo",
-                "Preséntate con este código al llegar a la tienda.");
+                "Muestra este código al llegar").doesNotContain("http");
     }
 
     @Test

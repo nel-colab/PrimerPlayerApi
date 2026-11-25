@@ -28,7 +28,7 @@ class ImportarArchivoExcelServiceTest {
             primera.createCell(0).setCellValue("Producto A");
             primera.createCell(2).setCellValue(4990);
             primera.createCell(3).setCellValue(8);
-            primera.createCell(4).setCellValue("tcg-pokemon");
+            primera.createCell(4).setCellValue("tcg");
             primera.createCell(5).setCellValue("Sí");
             primera.createCell(7).setCellValue("Español");
             primera.createCell(8).setCellValue("Línea A");
@@ -47,14 +47,14 @@ class ImportarArchivoExcelServiceTest {
         assertThat(lectura.filas().get(0).nombre()).isEqualTo("Producto A");
         assertThat(lectura.filas().get(0).precio()).isEqualTo(4990);
         assertThat(lectura.filas().get(0).stock()).isEqualTo(8);
-        assertThat(lectura.filas().get(0).categoria()).isEqualTo("tcg-pokemon");
+        assertThat(lectura.filas().get(0).categoria()).isEqualTo("tcg");
         assertThat(lectura.filas().get(0).publicado()).isTrue();
         assertThat(lectura.filas().get(1).publicado()).isFalse();
     }
 
     @Test
     void parsearCsv_admiteSeparadorPuntoYComaYRegistraNumeroInvalidoPorFila() throws Exception {
-        String csv = "Nombre;Precio;Stock;Categoria;Publicado\nProducto A;4.990;3;tcg-pokemon;si\nProducto B;inválido;1;tcg-pokemon;no";
+        String csv = "Nombre;Precio;Stock;Categoria;Publicado\nProducto A;4.990;3;tcg;si\nProducto B;inválido;1;tcg;no";
 
         var lectura = importar.parsearCsv(new ByteArrayInputStream(csv.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
 

@@ -36,7 +36,8 @@ import tools.jackson.databind.json.JsonMapper;
 class RevisionJdbcAdapter implements RevisionRepositorio {
 
     private static final String COLUMNAS = "id, producto_id, tipo, estado, datos_propuestos::text AS datos_propuestos, "
-            + "version_base, motivo_rechazo, solicitado_por, solicitado_en, revisado_por, revisado_en";
+            + "datos_aprobados::text AS datos_aprobados, version_base, motivo_rechazo, solicitado_por, solicitado_en, "
+            + "revisado_por, revisado_en";
 
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
@@ -87,6 +88,12 @@ class RevisionJdbcAdapter implements RevisionRepositorio {
     }
 
     @Override
+    public void guardarAprobados(long id, DatosProducto aprobados) {
+        jdbc.update("UPDATE producto_revision SET datos_aprobados = CAST(? AS jsonb) WHERE id = ? AND estado = 'APROBADA'",
+                aJson(aprobados), id);
+    }
+
+    @Override
     public Pagina<Revision> buscar(EstadoRevision estado, int page, int size) {
         String where = estado == null ? "" : " WHERE estado = ?";
         List<Object> args = new ArrayList<>();
@@ -116,7 +123,7 @@ class RevisionJdbcAdapter implements RevisionRepositorio {
     private Revision fila(ResultSet rs, int n) throws SQLException {
         return new Revision(rs.getLong("id"), rs.getLong("producto_id"), TipoRevision.valueOf(rs.getString("tipo")),
                 EstadoRevision.valueOf(rs.getString("estado")), deJson(rs.getString("datos_propuestos")),
-                rs.getInt("version_base"), rs.getString("motivo_rechazo"), rs.getLong("solicitado_por"),
+                deJson(rs.getString("datos_aprobados")), rs.getInt("version_base"), rs.getString("motivo_rechazo"), rs.getLong("solicitado_por"),
                 instante(rs, "solicitado_en"), rs.getObject("revisado_por", Long.class),
                 instante(rs, "revisado_en"));
     }

@@ -251,8 +251,8 @@ class AdminUsuariosIntegracionTest {
         long id = idDe(email);
         como(admin, post("/api/v1/admin/usuarios/" + id + "/restablecimiento-password"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.cambioPasswordPendiente").value(true));
-        await().atMost(ESPERA).until(() -> correos.para(email).stream().anyMatch(c -> c.asunto().contains("Restablece")));
-        assertThat(correos.token(email, "Restablece")).isNotBlank();
+        await().atMost(ESPERA).until(() -> correos.para(email).stream().anyMatch(c -> c.asunto().contains("restablecer")));
+        assertThat(correos.codigo(email, "restablecer")).hasSize(6);
         auditado(id, "CAMBIO_PASSWORD_SOLICITADO");
 
         String access = JsonPath.read(login(email).andReturn().getResponse().getContentAsString(), "$.accessToken");

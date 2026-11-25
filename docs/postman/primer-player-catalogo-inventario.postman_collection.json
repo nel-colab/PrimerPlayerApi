@@ -67,7 +67,7 @@
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/admin/productos",
-            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sobre Pokémon Black Bolt\",\n  \"descripcion\": \"Sobre de 10 cartas.\",\n  \"precio\": 4990,\n  \"categoria\": \"tcg-pokemon\",\n  \"tipo\": \"Sobre\",\n  \"idioma\": \"Inglés\",\n  \"franquicia\": \"Pokémon\",\n  \"linea\": \"Scarlet & Violet\",\n  \"codigoBarras\": null,\n  \"limitePorUsuario\": 4,\n  \"publicado\": true,\n  \"imagenes\": [\n    { \"url\": \"https://cdn.primerplayer.cl/black-bolt.webp\", \"portada\": true }\n  ]\n}" }
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sobre Pokémon Black Bolt\",\n  \"descripcion\": \"Sobre de 10 cartas.\",\n  \"precio\": 4990,\n  \"categoria\": \"tcg\",\n  \"tipo\": \"Sobre\",\n  \"idioma\": \"Inglés\",\n  \"franquicia\": \"Pokémon\",\n  \"linea\": \"Scarlet & Violet\",\n  \"codigoBarras\": null,\n  \"limitePorUsuario\": 4,\n  \"publicado\": true,\n  \"imagenes\": [\n    { \"url\": \"https://cdn.primerplayer.cl/black-bolt.webp\", \"portada\": true }\n  ]\n}" }
           },
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('201', () => pm.response.to.have.status(201));",
@@ -83,7 +83,7 @@
               "host": ["{{baseUrl}}"], "path": ["admin", "productos"],
               "query": [
                 { "key": "q", "value": "black", "description": "nombre (sin tildes), id o código de barras" },
-                { "key": "categoria", "value": "figuras", "disabled": true, "description": "slug hoja o agrupadora; repetible" },
+                { "key": "categoria", "value": "figuras", "disabled": true, "description": "slug de categoría general (tcg, figuras, venta-videojuegos, consolas, accesorios-consolas); repetible" },
                 { "key": "estado", "value": "publicado", "description": "publicado | oculto | stock-bajo | agotado; repetible" },
                 { "key": "sort", "value": "nombre,asc", "description": "id | nombre | precio | stock | fecha" },
                 { "key": "page", "value": "0" },
@@ -103,7 +103,7 @@
               { "key": "If-Match", "value": "\"{{version}}\"" }
             ],
             "url": "{{baseUrl}}/admin/productos/{{productoId}}",
-            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sobre Pokémon Black Bolt (EN)\",\n  \"descripcion\": \"Sobre de 10 cartas.\",\n  \"precio\": 5490,\n  \"categoria\": \"tcg-pokemon\",\n  \"tipo\": \"Sobre\",\n  \"idioma\": \"Inglés\",\n  \"franquicia\": \"Pokémon\",\n  \"linea\": \"Scarlet & Violet\",\n  \"codigoBarras\": null,\n  \"limitePorUsuario\": 4,\n  \"publicado\": true,\n  \"imagenes\": [\n    { \"url\": \"https://cdn.primerplayer.cl/black-bolt.webp\", \"portada\": true }\n  ]\n}" }
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sobre Pokémon Black Bolt (EN)\",\n  \"descripcion\": \"Sobre de 10 cartas.\",\n  \"precio\": 5490,\n  \"categoria\": \"tcg\",\n  \"tipo\": \"Sobre\",\n  \"idioma\": \"Inglés\",\n  \"franquicia\": \"Pokémon\",\n  \"linea\": \"Scarlet & Violet\",\n  \"codigoBarras\": null,\n  \"limitePorUsuario\": 4,\n  \"publicado\": true,\n  \"imagenes\": [\n    { \"url\": \"https://cdn.primerplayer.cl/black-bolt.webp\", \"portada\": true }\n  ]\n}" }
           }
         },
         {

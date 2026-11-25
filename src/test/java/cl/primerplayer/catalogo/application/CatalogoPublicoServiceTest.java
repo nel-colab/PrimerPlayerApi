@@ -52,7 +52,7 @@ class CatalogoPublicoServiceTest {
     final CatalogoPublicoService service = new CatalogoPublicoService(repo);
 
     static ProductoPublico producto(long id) {
-        return new ProductoPublico(id, "Producto " + id, null, 1990, "tcg-pokemon", "sobres", null, null, null, null,
+        return new ProductoPublico(id, "Producto " + id, null, 1990, "tcg", "sobres", null, null, null, null,
                 null, null, 3, 0, LocalDate.of(2026, 11, 1), List.of());
     }
 

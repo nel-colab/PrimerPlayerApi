@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio.FilaCuenta;
-import cl.primerplayer.identidad.domain.TokenOpaco;
+import cl.primerplayer.identidad.domain.CodigoVerificacion;
 import cl.primerplayer.identidad.domain.TokenUnUso;
 import cl.primerplayer.shared.api.Rol;
 
@@ -42,16 +42,20 @@ class EnlacesCuentaServiceTest {
     }
 
     @Test
-    void verificacion_guardaSoloElHashYDevuelveElTokenConSuVigencia() {
+    void verificacion_guardaSoloElHashYDevuelveUnCodigoDe6DigitosConSuVigencia() {
         when(cuentas.porId(7)).thenReturn(Optional.of(cuenta(true, null)));
 
         var emitido = servicio.emitirVerificacion(7).orElseThrow();
 
+        assertThat(emitido.valor()).matches("\\d{6}");
         assertThat(emitido.vigencia()).isEqualTo(Duration.ofHours(24));
         assertThat(emitido.toString()).doesNotContain(emitido.valor());
         assertThat(tokens.guardados).singleElement().satisfies(t -> {
             assertThat(t.tipo()).isEqualTo(TokenUnUso.Tipo.VERIFICACION);
-            assertThat(t.tokenHash()).isEqualTo(TokenOpaco.hashDe(emitido.valor())).isNotEqualTo(emitido.valor());
+            assertThat(t.tokenHash()).isEqualTo(CodigoVerificacion.hash(t.id(), emitido.valor()))
+                    .doesNotContain(emitido.valor());
+            assertThat(CodigoVerificacion.coincide(t.id(), emitido.valor(), t.tokenHash())).isTrue();
+            assertThat(t.creadoEn()).isEqualTo(AHORA);
             assertThat(t.expiraEn()).isEqualTo(AHORA.plus(Duration.ofHours(24)));
         });
     }

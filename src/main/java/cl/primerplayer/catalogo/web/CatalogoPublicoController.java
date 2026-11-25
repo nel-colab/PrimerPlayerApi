@@ -49,7 +49,7 @@ class CatalogoPublicoController {
             description = "Los filtros de lista (tipo, idioma, ...) son repetibles: OR dentro de la misma faceta, AND entre "
                     + "facetas. Cada faceta se calcula sobre el resultado sin su propio filtro.")
     CatalogoPaginaResponse buscar(
-            @Parameter(description = "slug hoja o agrupadora; 'todos' = sin filtro", example = "tcg-pokemon")
+            @Parameter(description = "slug hoja o agrupadora; 'todos' = sin filtro", example = "tcg")
             @RequestParam(required = false) String categoria,
             @Parameter(description = "texto en el nombre (sin importar tildes)") @RequestParam(required = false) String q,
             @Parameter(description = "solo con stock") @RequestParam(defaultValue = "false") boolean enStock,

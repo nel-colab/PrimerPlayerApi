@@ -26,6 +26,23 @@ public interface RevisionesProductoUseCase {
     RevisionProducto aprobar(long revisionId, long adminId);
 
     /**
+     * Aprobar con cambios: el ADMIN corrige los datos antes de aprobar y el producto queda exactamente con
+     * {@code cambios.datos()} (incluido {@code publicado}). Se aplican las reglas de un ADMIN (puede cambiar código de
+     * barras y límite). Una EDICION desactualizada sí se puede aprobar así: el ADMIN la ajustó sobre la versión actual.
+     *
+     * @param cambios {@code null} = aprobar tal cual ({@link #aprobar(long, long)})
+     * @throws RevisionNoPendienteException                        si ya no está pendiente
+     * @throws cl.primerplayer.shared.api.ConflictoVersionException si el producto cambió desde que el ADMIN lo leyó
+     */
+    RevisionProducto aprobar(long revisionId, CambiosAprobacion cambios, long adminId);
+
+    /**
+     * @param datos           lo que debe quedar en el producto
+     * @param versionProducto versión del producto que vio el ADMIN al corregir (la de {@code actual.version})
+     */
+    record CambiosAprobacion(DatosProducto datos, int versionProducto) {}
+
+    /**
      * Alta: el producto queda {@link EstadoAprobacion#RECHAZADO} (el vendedor lo corrige y vuelve a revisión).
      * Edición: la propuesta se descarta; el producto no cambia.
      *
@@ -40,6 +57,7 @@ public interface RevisionesProductoUseCase {
     /**
      * @param actual         el producto como está hoy
      * @param propuesto      datos propuestos (solo en una EDICION; en un ALTA lo propuesto es el propio producto)
+     * @param aprobado       si un ADMIN la aprobó con cambios: los datos que aprobó; {@code null} si se aprobó tal cual
      * @param desactualizada la EDICION se propuso sobre una versión anterior del producto: no se puede aprobar
      */
     record RevisionProducto(
@@ -49,6 +67,7 @@ public interface RevisionesProductoUseCase {
             EstadoRevision estado,
             ProductoAdmin actual,
             DatosProducto propuesto,
+            DatosProducto aprobado,
             boolean desactualizada,
             String motivoRechazo,
             long solicitadoPor,

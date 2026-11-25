@@ -23,6 +23,7 @@ import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.TipoRevision;
 import cl.primerplayer.catalogo.application.port.out.ProductoRepositorio;
 import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio;
 import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio.Revision;
+import cl.primerplayer.catalogo.domain.CodigoBarras;
 import cl.primerplayer.catalogo.domain.Producto;
 import cl.primerplayer.catalogo.events.ProductoEnRevision;
 import cl.primerplayer.shared.api.Pagina;
@@ -135,6 +136,20 @@ class ProductosAdminService implements AdministrarProductosUseCase, ConsultarPro
         productos.actualizar(actual.eliminar(ahora), actual.version());
         revisiones.pendienteDe(id).ifPresent(r ->
                 revisiones.resolver(r.id(), EstadoRevision.DESCARTADA, null, actor.usuarioId(), ahora));
+    }
+
+    @Override
+    @Transactional   // no readOnly: PostgreSQL no permite nextval() en una transacción de solo lectura
+    public String generarCodigoBarras() {
+        // El correlativo nunca se repite; solo puede chocar con un código escrito a mano en el rango 200 o con los
+        // datos de demostración. Se salta los ocupados (en la práctica, ninguno o muy pocos).
+        for (int intento = 0; intento < 100; intento++) {
+            String codigo = CodigoBarras.eanInterno(productos.siguienteCorrelativoInterno());
+            if (!productos.codigoBarrasEnUso(codigo)) {
+                return codigo;
+            }
+        }
+        throw new IllegalStateException("No se encontró un código de barras interno libre en 100 intentos.");
     }
 
     /**

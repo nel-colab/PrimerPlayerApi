@@ -35,6 +35,9 @@ class TokenUnUsoEntity {
     @Column(name = "token_hash", nullable = false, length = 64)
     private String tokenHash;
 
+    @Column(name = "creado_en", nullable = false)
+    private Instant creadoEn;
+
     @Column(name = "expira_en", nullable = false)
     private Instant expiraEn;
 

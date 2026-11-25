@@ -50,6 +50,13 @@ public interface AdministrarProductosUseCase {
     /** Borrado lógico ({@code eliminado_en}); el historial de pedidos no se rompe. Descarta revisiones pendientes. */
     void eliminar(long id, Actor actor);
 
+    /**
+     * Código de barras interno para un producto que no trae uno de fábrica: EAN-13 {@code 200} + correlativo +
+     * verificador, que no está en uso. No lo reserva: queda asignado al guardar el producto con él. Dos llamadas
+     * nunca devuelven el mismo código.
+     */
+    String generarCodigoBarras();
+
     /** Quién ejecuta el comando (sale del token). */
     record Actor(long usuarioId, Rol rol) {
 

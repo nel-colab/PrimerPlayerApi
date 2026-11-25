@@ -2,6 +2,7 @@ package cl.primerplayer.identidad.application.port.out;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 import cl.primerplayer.identidad.domain.TokenUnUso;
 import cl.primerplayer.shared.api.Rol;
@@ -14,12 +15,24 @@ public interface CuentaRepositorio {
 
     void actualizarPerfil(long usuarioId, String nombre, String telefono, String rut, Instant ahora);
 
+    /** Id de la cuenta con ese correo (no eliminada ni anónima). */
+    Optional<Long> idPorEmail(String email);
+
     /**
-     * Marca el token como usado si es del tipo, no se usó y no venció (UPDATE atómico: un enlace sirve una sola vez).
-     *
-     * @return el usuario dueño del token
+     * Código pendiente más reciente de la cuenta (no usado, no vencido), bloqueado ({@code FOR UPDATE}) hasta el fin de
+     * la transacción: dos intentos simultáneos se serializan y cuentan bien.
      */
-    Optional<Long> consumirToken(String tokenHash, TokenUnUso.Tipo tipo, Instant ahora);
+    Optional<CodigoPendiente> bloquearCodigoPendiente(long usuarioId, TokenUnUso.Tipo tipo, Instant ahora);
+
+    /** Suma un intento errado; al llegar a {@code maxIntentos} el código vence. */
+    void registrarIntentoFallido(UUID tokenId, int maxIntentos, Instant ahora);
+
+    void marcarUsado(UUID tokenId, Instant ahora);
+
+    /** Intentos errados de la cuenta con códigos de ese tipo emitidos desde {@code desde}. */
+    int intentosFallidosDesde(long usuarioId, TokenUnUso.Tipo tipo, Instant desde);
+
+    record CodigoPendiente(UUID id, String hash) {}
 
     void marcarVerificado(long usuarioId, Instant ahora);
 

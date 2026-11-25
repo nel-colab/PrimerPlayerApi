@@ -50,14 +50,17 @@ interface CatalogoWebMapper {
 
     default RevisionResponse toRevision(RevisionProducto r) {
         DatosProducto p = r.propuesto();
-        PropuestaResponse propuesto = p == null ? null : new PropuestaResponse(p.nombre(), p.descripcion(), p.precio(),
-                p.categoria(), p.tipo(), p.idioma(), p.marca(), p.plataforma(), p.franquicia(), p.linea(),
-                p.codigoBarras(), p.limitePorCliente(), p.publicado(), portada(p.imagenes()),
-                p.imagenes().stream().map(this::toDto).toList());
         List<String> campos = p == null || r.actual() == null ? List.of() : camposModificados(r.actual(), p);
         return new RevisionResponse(r.id(), r.productoId(), r.tipo(), r.estado(),
-                r.actual() == null ? null : toResponse(r.actual()), propuesto, campos, r.desactualizada(),
+                r.actual() == null ? null : toResponse(r.actual()), toPropuesta(p), toPropuesta(r.aprobado()), campos,
+                r.desactualizada(),
                 r.motivoRechazo(), r.solicitadoPor(), r.solicitadoEn(), r.revisadoPor(), r.revisadoEn());
+    }
+
+    default PropuestaResponse toPropuesta(DatosProducto p) {
+        return p == null ? null : new PropuestaResponse(p.nombre(), p.descripcion(), p.precio(), p.categoria(), p.tipo(),
+                p.idioma(), p.marca(), p.plataforma(), p.franquicia(), p.linea(), p.codigoBarras(),
+                p.limitePorCliente(), p.publicado(), portada(p.imagenes()), p.imagenes().stream().map(this::toDto).toList());
     }
 
     /** Nombres de campo como los ve el frontend ({@code limitePorUsuario}, no {@code limitePorCliente}). */

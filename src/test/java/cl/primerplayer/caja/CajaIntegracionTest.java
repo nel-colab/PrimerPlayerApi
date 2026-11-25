@@ -75,7 +75,7 @@ class CajaIntegracionTest {
 
     void item(long pedidoId, String nombre, int cantidad, long precio) {
         long productoId = jdbc.queryForObject("""
-                INSERT INTO producto (nombre, precio, categoria_id) VALUES (?, ?, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'))
+                INSERT INTO producto (nombre, precio, categoria_id) VALUES (?, ?, (SELECT id FROM categoria WHERE slug = 'tcg'))
                 RETURNING id""", Long.class, nombre, precio);
         jdbc.update("INSERT INTO pedido_item (pedido_id, tipo, producto_id, nombre, cantidad, precio_unitario) VALUES (?, 'product', ?, ?, ?, ?)",
                 pedidoId, productoId, nombre, cantidad, precio);

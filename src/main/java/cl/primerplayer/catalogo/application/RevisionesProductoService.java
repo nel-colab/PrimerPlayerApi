@@ -13,6 +13,7 @@ import cl.primerplayer.catalogo.application.port.out.ProductoRepositorio;
 import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio;
 import cl.primerplayer.catalogo.application.port.out.RevisionRepositorio.Revision;
 import cl.primerplayer.catalogo.domain.Producto;
+import cl.primerplayer.shared.api.ConflictoVersionException;
 import cl.primerplayer.shared.api.Pagina;
 import cl.primerplayer.shared.api.RecursoNoEncontradoException;
 import cl.primerplayer.shared.api.Rol;
@@ -75,6 +76,31 @@ class RevisionesProductoService implements RevisionesProductoUseCase {
 
     @Override
     @Transactional
+    public RevisionProducto aprobar(long revisionId, CambiosAprobacion cambios, long adminId) {
+        if (cambios == null) {
+            return aprobar(revisionId, adminId);
+        }
+        Revision r = pendienteBloqueada(revisionId);
+        Producto actual = productoDe(r);
+        // El ADMIN corrigió sobre la versión que vio: si alguien cambió el producto entre medio, que vuelva a mirar.
+        // (Una propuesta desactualizada no importa aquí: lo que queda es lo que el ADMIN dejó.)
+        if (actual.version() != cambios.versionProducto()) {
+            throw new ConflictoVersionException();
+        }
+        referencias.validar(cambios.datos());
+        var ahora = clock.instant();
+
+        Producto base = actual.aprobado() ? actual : actual.aprobar(ahora);   // ALTA: aprobada, ya puede publicarse
+        Producto aplicado = base.actualizar(cambios.datos(), Rol.ADMIN, ahora);
+        productos.actualizar(aplicado, actual.version());
+
+        revisiones.resolver(r.id(), EstadoRevision.APROBADA, null, adminId, ahora);
+        revisiones.guardarAprobados(r.id(), aplicado.datos());   // normalizados: lo que de verdad quedó
+        return recargar(r.id());
+    }
+
+    @Override
+    @Transactional
     public RevisionProducto rechazar(long revisionId, String motivo, long adminId) {
         if (motivo == null || motivo.isBlank()) {
             throw new ValidacionException("motivo", "El motivo del rechazo es obligatorio.");
@@ -117,7 +143,7 @@ class RevisionesProductoService implements RevisionesProductoUseCase {
         boolean desactualizada = r.tipo() == TipoRevision.EDICION && r.estado() == EstadoRevision.PENDIENTE
                 && producto != null && producto.version() != r.versionBase();
         return new RevisionProducto(r.id(), r.productoId(), r.tipo(), r.estado(), producto == null ? null : ProductosAdmin.de(producto),
-                r.propuesto(), desactualizada, r.motivoRechazo(), r.solicitadoPor(), r.solicitadoEn(),
+                r.propuesto(), r.aprobado(), desactualizada, r.motivoRechazo(), r.solicitadoPor(), r.solicitadoEn(),
                 r.revisadoPor(), r.revisadoEn());
     }
 }

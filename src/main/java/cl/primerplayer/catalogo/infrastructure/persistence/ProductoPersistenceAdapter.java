@@ -77,6 +77,16 @@ class ProductoPersistenceAdapter implements ProductoRepositorio {
     }
 
     @Override
+    public long siguienteCorrelativoInterno() {
+        return productos.siguienteCorrelativoInterno();
+    }
+
+    @Override
+    public boolean codigoBarrasEnUso(String codigo) {
+        return productos.existsByCodigoBarras(codigo);
+    }
+
+    @Override
     public Producto guardarNuevo(Producto p) {
         ProductoEntity e = new ProductoEntity();
         e.setCreadoEn(p.actualizadoEn());

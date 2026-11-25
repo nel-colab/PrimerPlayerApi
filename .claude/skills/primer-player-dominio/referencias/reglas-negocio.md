@@ -18,10 +18,16 @@
 - **Perfil completo del personal**: VENDEDOR/ADMIN sin nombre, teléfono o RUT reciben 403 `profile-incomplete` en
   `/admin/**` (se revisa en la base en cada request). Lo completan en `PUT /me/perfil`; `GET /me` expone
   `profileComplete`. Comprar no exige perfil completo.
-- **Enlaces de un solo uso** (verificar correo, restablecer contraseña): en la base solo se guarda el SHA-256. Los
-  eventos (`UsuarioRegistrado`, `VerificacionSolicitada`, `RecuperacionSolicitada`) **no llevan el token**, porque
-  quedan en el outbox: notificaciones lo pide a `EnlacesCuentaUseCase` justo antes de enviar el correo. Cada correo
-  nuevo invalida los enlaces anteriores del mismo tipo: solo sirve el último.
+- **Códigos de un solo uso** (verificar correo, restablecer contraseña; V16): 6 dígitos que la persona escribe en la
+  web junto a su correo (`{email, codigo}`). En la base solo queda SHA-256(`id:código`). Máx. **5 intentos por código**
+  (al 5º vence) y **10 errados por hora** por cuenta y tipo (429 `too-many-attempts`), para que pedir códigos nuevos no
+  permita seguir adivinando. Un correo no registrado responde igual que un código malo (400 `invalid-code`). Los
+  eventos (`UsuarioRegistrado`, `VerificacionSolicitada`, `RecuperacionSolicitada`) **no llevan el código**, porque
+  quedan en el outbox: notificaciones lo pide a `EnlacesCuentaUseCase` justo antes de enviar. Cada correo nuevo
+  invalida los códigos anteriores del mismo tipo: solo sirve el último.
+- **Correos sin URLs** (decisión de la tienda): ningún correo lleva enlaces, botones ni imágenes clickeables. HTML con
+  la marca (logo incrustado `cid:`, sin cargar nada de internet) + versión de texto, desde una plantilla única
+  (`templates/correo/mensaje.html`, modelo `MensajeCorreo`). Lo que hay que hacer se explica con texto.
 
 ## Stock
 
@@ -93,9 +99,18 @@ Códigos que el frontend ya mapea:
   El servidor **no descarga** URLs externas (evita SSRF).
 - Código de barras: opcional y único. Cualquier rol interno lo define al crear; **después solo ADMIN** puede
   agregarlo (si no tenía) o cambiarlo; para VENDEDOR es inmutable (`barcode-immutable`, 409). Formato EAN-8, UPC-A (12) o
-  EAN-13 con dígito verificador válido. (Pregunta abierta: si la tienda usa códigos internos, relajar a 8–14 dígitos.)
+  EAN-13 con dígito verificador válido. Productos sin código de fábrica: `POST /admin/productos/codigo-barras` genera
+  un **EAN-13 interno** `200` + correlativo de 9 dígitos + verificador (prefijo GS1 200–299, uso interno de la
+  tienda: nunca coincide con un código de fábrica). El correlativo sale de `producto_codigo_interno_seq` (V14, parte
+  en 1000), así dos llamadas nunca repiten, y se salta cualquier código ya usado (incluso por productos eliminados).
+  No se reserva: queda asignado al guardar el producto. No se aceptan números inventados a mano sin verificador.
 - Descripción con formato simple (párrafos, `## `, `- `); se guarda como texto, nunca HTML.
-- Categoría asignada siempre es una categoría **hoja**.
+- Categoría asignada siempre es una categoría **hoja**. Desde V13 solo hay 5 categorías generales (todas hojas):
+  `tcg`, `figuras`, `venta-videojuegos` (Videojuegos), `consolas` y `accesorios-consolas` (Accesorios); `todos` es
+  la única agrupadora (navegación, sin filtro). La subdivisión va en los campos del producto, que el catálogo filtra
+  como facetas: TCG y Figuras → `franquicia`; Videojuegos → `plataforma` (`PlayStation 5`, `Nintendo Switch`...);
+  Consolas → `tipo` (`Venta`, `Usadas`, `Arriendo`); Accesorios → `tipo` (`Controles`, `Audífonos`...). Funko Pop
+  es una **marca** (`Funko Pop`) dentro de Figuras, no una franquicia.
 
 ## Aprobación de productos (autorización previa)
 
@@ -113,8 +128,12 @@ ADMIN se aplica directo. Tabla `producto_revision`; a lo más una revisión `PEN
   tienda sigue vendiendo lo aprobado. Las reglas del rol (`barcode-immutable`, `limit-admin-only`, `If-Match`) se
   validan al proponer. Una nueva edición reemplaza la propuesta pendiente; proponer exactamente lo aprobado la descarta.
   Aprobar copia lo propuesto al producto; rechazar la descarta y el producto no cambia.
-- **Propuesta desactualizada**: si el producto cambió después de proponer (versión ≠ `version_base`), aprobar da
-  409 `review-outdated` (no se pisan cambios ajenos); el ADMIN la rechaza y el vendedor la propone de nuevo.
+- **Propuesta desactualizada**: si el producto cambió después de proponer (versión ≠ `version_base`), aprobarla tal
+  cual da 409 `review-outdated` (no se pisan cambios ajenos). El ADMIN la rechaza, o la aprueba con cambios.
+- **Aprobar con cambios** (V15): el ADMIN corrige la solicitud antes de aprobar (`{datos, version}` en el cuerpo de la
+  aprobación). El producto queda exactamente con `datos` (incluido `publicado`), con las reglas de ADMIN (puede
+  cambiar código de barras y límite). `version` es la del producto que vio el ADMIN: si cambió → `version-conflict`.
+  `datos_propuestos` conserva lo del vendedor y `datos_aprobados` lo que aprobó el ADMIN (null si fue tal cual).
 - **Publicación**: ocultar siempre se aplica directo (sacar de la venta es la dirección segura). Publicar: el ADMIN
   directo (si el producto no estaba aprobado, publicarlo lo aprueba y cierra su revisión); el VENDEDOR sobre un
   producto aprobado → propuesta (202); sobre uno no aprobado → 409 `product-not-approved`.

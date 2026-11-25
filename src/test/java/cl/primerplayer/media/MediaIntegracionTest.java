@@ -123,7 +123,7 @@ class MediaIntegracionTest {
         String imagen = idDe(subir(vendedor, "imagenes", png(8, 8), "a.png"));
         String comprobante = idDe(subir(vendedor, "comprobantes", png(8, 8), "c.png"));
         String body = """
-                {"nombre":"Figura con foto","precio":19990,"categoria":"figuras-pokemon","publicado":true,
+                {"nombre":"Figura con foto","precio":19990,"categoria":"figuras","publicado":true,
                  "imagenes":[{"archivoId":"%s","portada":true},{"url":"https://cdn.test/extra.webp","portada":false}]}""";
 
         mvc.perform(post("/api/v1/admin/productos").header(HttpHeaders.AUTHORIZATION, vendedor.bearer())
@@ -146,7 +146,7 @@ class MediaIntegracionTest {
         String comprobante = idDe(subir(vendedor, "comprobantes", png(8, 8), "c.png"));
         long producto = jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id, stock, publicado)
-                VALUES ('Sobre transferencia', 4990, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'), 3, true) RETURNING id
+                VALUES ('Sobre transferencia', 4990, (SELECT id FROM categoria WHERE slug = 'tcg'), 3, true) RETURNING id
                 """, Long.class);
         mvc.perform(post("/api/v1/admin/pos/ventas").header(HttpHeaders.AUTHORIZATION, vendedor.bearer())
                         .header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON)

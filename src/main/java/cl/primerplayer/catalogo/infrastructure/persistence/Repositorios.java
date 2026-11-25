@@ -23,6 +23,11 @@ interface ProductoJpaRepository extends JpaRepository<ProductoEntity, Long>, Jpa
 
     List<ProductoEntity> findAllByEliminadoEnIsNullOrderByIdAsc();
 
+    @Query(value = "SELECT nextval('producto_codigo_interno_seq')", nativeQuery = true)
+    long siguienteCorrelativoInterno();
+
+    boolean existsByCodigoBarras(String codigoBarras);
+
     /** De esos productos, los que tienen una edición de un VENDEDOR esperando aprobación. */
     @Query(value = """
         SELECT producto_id FROM producto_revision

@@ -13,7 +13,7 @@ import cl.primerplayer.identidad.api.EnlacesCuentaUseCase;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio.FilaCuenta;
 import cl.primerplayer.identidad.application.port.out.TokenUnUsoRepositorio;
-import cl.primerplayer.identidad.domain.TokenOpaco;
+import cl.primerplayer.identidad.domain.CodigoVerificacion;
 import cl.primerplayer.identidad.domain.TokenUnUso;
 
 @Service
@@ -53,9 +53,10 @@ class EnlacesCuentaService implements EnlacesCuentaUseCase {
 
     private TokenEmitido emitir(long usuarioId, TokenUnUso.Tipo tipo, Duration ttl) {
         Instant ahora = clock.instant();
-        tokens.invalidarPendientes(usuarioId, tipo, ahora);   // solo sirve el enlace del último correo
-        TokenOpaco token = TokenOpaco.generar();
-        tokens.guardar(new TokenUnUso(java.util.UUID.randomUUID(), usuarioId, tipo, token.hash(), ahora.plus(ttl)));
-        return new TokenEmitido(token.valor(), ttl);
+        tokens.invalidarPendientes(usuarioId, tipo, ahora);   // solo sirve el código del último correo
+        java.util.UUID id = java.util.UUID.randomUUID();
+        String codigo = CodigoVerificacion.generar();
+        tokens.guardar(new TokenUnUso(id, usuarioId, tipo, CodigoVerificacion.hash(id, codigo), ahora, ahora.plus(ttl)));
+        return new TokenEmitido(codigo, ttl);
     }
 }

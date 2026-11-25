@@ -58,7 +58,7 @@ class ReportesIntegracionTest {
         cliente = TokensDePrueba.crear(jdbc, encoder, Rol.CLIENTE);
         long producto = jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id) VALUES ('Sobre 2018', 5000,
-                (SELECT id FROM categoria WHERE slug = 'tcg-pokemon')) RETURNING id""", Long.class);
+                (SELECT id FROM categoria WHERE slug = 'tcg')) RETURNING id""", Long.class);
         long evento = jdbc.queryForObject("""
                 INSERT INTO evento (titulo, tipo, fecha_hora, lugar, precio, cupos_totales, descripcion)
                 VALUES ('Torneo 2018', 'torneo-tcg', '2018-04-01T15:00:00-03:00', 'Tienda', 3000, 10, 'x') RETURNING id""", Long.class);

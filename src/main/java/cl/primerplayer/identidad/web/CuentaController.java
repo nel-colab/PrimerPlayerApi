@@ -38,25 +38,28 @@ class CuentaController {
     // ---------- públicos: enlaces que llegan por correo ----------
 
     @PostMapping("/api/v1/auth/verificacion")
-    @Operation(summary = "Verificar el correo con el token del enlace", description = "204. 400 invalid-token si venció o ya se usó.")
-    ResponseEntity<Void> verificar(@Valid @RequestBody TokenRequest req) {
-        cuenta.verificarEmail(req.token());
+    @Operation(summary = "Verificar el correo con el código de 6 dígitos que llegó por correo",
+            description = "204. 400 invalid-code si no corresponde, venció, ya se usó o agotó sus 5 intentos (mismo error "
+                    + "si el correo no está registrado). 429 too-many-attempts tras 10 códigos errados en una hora.")
+    ResponseEntity<Void> verificar(@Valid @RequestBody CodigoRequest req) {
+        cuenta.verificarEmail(req.email(), req.codigo());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/api/v1/auth/recuperacion")
-    @Operation(summary = "Pedir el enlace para restablecer la contraseña",
-            description = "Siempre 202 (no revela si el correo está registrado). El enlace vence en 1 hora.")
+    @Operation(summary = "Pedir el código para restablecer la contraseña",
+            description = "Siempre 202 (no revela si el correo está registrado). El código vence en 1 hora.")
     ResponseEntity<Void> recuperar(@Valid @RequestBody EmailRequest req) {
         cuenta.solicitarRecuperacion(req.email());
         return ResponseEntity.accepted().build();
     }
 
     @PostMapping("/api/v1/auth/restablecimiento")
-    @Operation(summary = "Definir una contraseña nueva con el token del enlace",
-            description = "204. Cierra todas las sesiones y desbloquea la cuenta. 400 invalid-token / validation.")
+    @Operation(summary = "Definir una contraseña nueva con el código que llegó por correo",
+            description = "204. Cierra todas las sesiones y desbloquea la cuenta. 400 invalid-code / validation; "
+                    + "429 too-many-attempts.")
     ResponseEntity<Void> restablecer(@Valid @RequestBody RestablecimientoRequest req) {
-        cuenta.restablecerPassword(req.token(), req.password());
+        cuenta.restablecerPassword(req.email(), req.codigo(), req.password());
         return ResponseEntity.noContent().build();
     }
 
@@ -94,15 +97,18 @@ class CuentaController {
 
     // ---------- DTO ----------
 
-    record TokenRequest(@NotBlank @Size(max = 200) String token) {
-        @Override public String toString() { return "TokenRequest[***]"; }
+    /** {@code codigo}: 6 dígitos; se aceptan espacios o guiones ("482 913"). */
+    record CodigoRequest(@Schema(example = "ana@correo.cl") @NotBlank @Email @Size(max = 254) String email,
+                         @Schema(example = "482913") @NotBlank @Size(max = 12) String codigo) {
+        @Override public String toString() { return "CodigoRequest[" + email + ", ***]"; }
     }
 
     record EmailRequest(@NotBlank @Email @Size(max = 254) String email) {}
 
-    record RestablecimientoRequest(@NotBlank @Size(max = 200) String token,
+    record RestablecimientoRequest(@Schema(example = "ana@correo.cl") @NotBlank @Email @Size(max = 254) String email,
+                                   @Schema(example = "482913") @NotBlank @Size(max = 12) String codigo,
                                    @Schema(example = "NuevaClave2026!") @NotBlank @Size(min = 8, max = 72) String password) {
-        @Override public String toString() { return "RestablecimientoRequest[***]"; }
+        @Override public String toString() { return "RestablecimientoRequest[" + email + ", ***]"; }
     }
 
     record PasswordRequest(@NotBlank String actual, @NotBlank @Size(min = 8, max = 72) String nueva) {

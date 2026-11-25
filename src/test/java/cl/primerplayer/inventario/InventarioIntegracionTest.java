@@ -67,7 +67,7 @@ class InventarioIntegracionTest {
     private long producto(int stock) {
         return jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id, stock, publicado)
-                VALUES ('Prueba inventario', 1000, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'), ?, TRUE)
+                VALUES ('Prueba inventario', 1000, (SELECT id FROM categoria WHERE slug = 'tcg'), ?, TRUE)
                 RETURNING id""", Long.class, stock);
     }
 

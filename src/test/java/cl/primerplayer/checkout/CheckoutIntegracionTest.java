@@ -68,7 +68,7 @@ class CheckoutIntegracionTest {
     long producto(long precio, int stock, Integer limite) {
         return jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id, stock, publicado, limite_por_cliente)
-                VALUES (?, ?, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'), ?, true, ?) RETURNING id
+                VALUES (?, ?, (SELECT id FROM categoria WHERE slug = 'tcg'), ?, true, ?) RETURNING id
                 """, Long.class, "Sobre " + UUID.randomUUID().toString().substring(0, 6), precio, stock, limite);
     }
 

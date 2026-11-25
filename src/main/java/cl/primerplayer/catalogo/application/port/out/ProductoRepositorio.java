@@ -29,6 +29,12 @@ public interface ProductoRepositorio {
 
     List<Producto> todosActivos();
 
+    /** Siguiente número de {@code producto_codigo_interno_seq} (no transaccional: dos llamadas nunca repiten). */
+    long siguienteCorrelativoInterno();
+
+    /** Algún producto, incluso eliminado, usa ese código (el índice único {@code uq_producto_codigo_barras} los incluye). */
+    boolean codigoBarrasEnUso(String codigo);
+
     /** @throws cl.primerplayer.catalogo.api.CodigoBarrasEnUsoException */
     Producto guardarNuevo(Producto producto);
 

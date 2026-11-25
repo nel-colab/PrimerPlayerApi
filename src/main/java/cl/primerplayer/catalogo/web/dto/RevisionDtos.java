@@ -6,13 +6,27 @@ import java.util.List;
 import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.EstadoRevision;
 import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.TipoRevision;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /** Autorización de productos: lo que un VENDEDOR crea o cambia espera la aprobación de un ADMIN. */
 public final class RevisionDtos {
 
     private RevisionDtos() {}
+
+    /**
+     * Cuerpo opcional de la aprobación. Sin cuerpo se aprueba tal cual; con cuerpo, "aprobar con cambios": el producto
+     * queda exactamente con {@code datos} (incluido {@code publicado}).
+     *
+     * @param version versión del producto que vio el ADMIN ({@code actual.version} de la revisión); si cambió → 409
+     *                {@code version-conflict}
+     */
+    public record AprobacionRequest(
+            @Valid @NotNull ProductoRequest datos,
+            @Schema(example = "3") @NotNull Integer version) {
+    }
 
     public record RechazoRequest(
             @Schema(example = "La foto de portada no corresponde al producto.") @NotBlank @Size(max = 500) String motivo) {
@@ -32,6 +46,8 @@ public final class RevisionDtos {
             @Schema(description = "PENDIENTE | APROBADA | RECHAZADA | DESCARTADA") EstadoRevision estado,
             ProductoResponse actual,
             PropuestaResponse propuesto,
+            @Schema(description = "Si un ADMIN la aprobó con cambios: lo que aprobó (null si se aprobó tal cual)")
+            PropuestaResponse aprobado,
             List<String> camposModificados,
             boolean desactualizada,
             String motivoRechazo,

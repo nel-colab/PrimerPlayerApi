@@ -2,6 +2,7 @@ package cl.primerplayer.identidad.application;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -10,13 +11,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import cl.primerplayer.identidad.api.CuentaUseCase;
-import cl.primerplayer.identidad.api.TokenInvalidoException;
+import cl.primerplayer.identidad.api.CodigoInvalidoException;
+import cl.primerplayer.identidad.api.DemasiadosIntentosException;
 import cl.primerplayer.identidad.api.YaVerificadoException;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio;
 import cl.primerplayer.identidad.application.port.out.CuentaRepositorio.FilaCuenta;
 import cl.primerplayer.identidad.application.port.out.HasherPassword;
 import cl.primerplayer.identidad.application.port.out.UsuarioRepositorio;
-import cl.primerplayer.identidad.domain.TokenOpaco;
+import cl.primerplayer.identidad.domain.CodigoVerificacion;
 import cl.primerplayer.identidad.domain.TokenUnUso;
 import cl.primerplayer.identidad.domain.Usuario;
 import cl.primerplayer.identidad.events.RecuperacionSolicitada;
@@ -28,6 +30,11 @@ import cl.primerplayer.shared.api.ValidacionException;
 class CuentaService implements CuentaUseCase {
 
     static final int MIN_PASSWORD = 8;
+    /**
+     * Tope de códigos errados por cuenta y tipo en una hora, sumando todos los códigos emitidos. Sin él, pedir códigos
+     * nuevos daría 5 intentos más cada vez; con él, adivinar un código de 6 dígitos es 1 en 100.000 por hora.
+     */
+    static final int MAX_INTENTOS_POR_HORA = 10;
     static final int MAX_BYTES_PASSWORD = 72;   // BCrypt ignora lo que pasa de 72 bytes
 
     private final CuentaRepositorio cuentas;
@@ -94,11 +101,11 @@ class CuentaService implements CuentaUseCase {
     }
 
     @Override
-    @Transactional
-    public void restablecerPassword(String token, String nueva) {
+    @Transactional(noRollbackFor = CodigoInvalidoException.class)   // el intento errado debe quedar contado
+    public void restablecerPassword(String email, String codigo, String nueva) {
         validarPassword("password", nueva);
         Instant ahora = clock.instant();
-        long usuarioId = consumir(token, TokenUnUso.Tipo.RECUPERACION, ahora);
+        long usuarioId = consumir(email, codigo, TokenUnUso.Tipo.RECUPERACION, ahora);
         cuentas.cambiarPassword(usuarioId, hasher.hashear(nueva), ahora);
         cuentas.revocarSesiones(usuarioId, ahora);
         cuentas.marcarVerificado(usuarioId, ahora);   // recibir el correo prueba que el correo es suyo
@@ -107,10 +114,10 @@ class CuentaService implements CuentaUseCase {
     // ---------- verificación ----------
 
     @Override
-    @Transactional
-    public void verificarEmail(String token) {
+    @Transactional(noRollbackFor = CodigoInvalidoException.class)   // el intento errado debe quedar contado
+    public void verificarEmail(String email, String codigo) {
         Instant ahora = clock.instant();
-        cuentas.marcarVerificado(consumir(token, TokenUnUso.Tipo.VERIFICACION, ahora), ahora);
+        cuentas.marcarVerificado(consumir(email, codigo, TokenUnUso.Tipo.VERIFICACION, ahora), ahora);
     }
 
     @Override
@@ -125,11 +132,28 @@ class CuentaService implements CuentaUseCase {
 
     // ---------- reglas ----------
 
-    private long consumir(String token, TokenUnUso.Tipo tipo, Instant ahora) {
-        if (token == null || token.isBlank()) {
-            throw new TokenInvalidoException();
+    /**
+     * Usa el código pendiente más reciente de la cuenta. Errar suma un intento: al 5º el código vence, y con 10 errados
+     * en una hora (entre todos los códigos) la cuenta queda bloqueada para este tipo hasta que pase la hora.
+     *
+     * @return el usuario dueño del código
+     */
+    private long consumir(String email, String codigo, TokenUnUso.Tipo tipo, Instant ahora) {
+        String limpio = CodigoVerificacion.normalizar(codigo);
+        if (limpio == null || email == null || email.isBlank()) {
+            throw new CodigoInvalidoException();
         }
-        return cuentas.consumirToken(TokenOpaco.hashDe(token.strip()), tipo, ahora).orElseThrow(TokenInvalidoException::new);
+        long usuarioId = cuentas.idPorEmail(Usuario.normalizarEmail(email)).orElseThrow(CodigoInvalidoException::new);
+        if (cuentas.intentosFallidosDesde(usuarioId, tipo, ahora.minus(Duration.ofHours(1))) >= MAX_INTENTOS_POR_HORA) {
+            throw new DemasiadosIntentosException();
+        }
+        var pendiente = cuentas.bloquearCodigoPendiente(usuarioId, tipo, ahora).orElseThrow(CodigoInvalidoException::new);
+        if (!CodigoVerificacion.coincide(pendiente.id(), limpio, pendiente.hash())) {
+            cuentas.registrarIntentoFallido(pendiente.id(), CodigoVerificacion.MAX_INTENTOS, ahora);
+            throw new CodigoInvalidoException();
+        }
+        cuentas.marcarUsado(pendiente.id(), ahora);
+        return usuarioId;
     }
 
     static void validarPassword(String campo, String password) {

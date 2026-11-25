@@ -26,7 +26,7 @@ class ProductoTest {
     static final String EAN = "7801234567894";
 
     static DatosProducto datos(String codigo, Integer limite, List<ImagenProducto> imagenes) {
-        return new DatosProducto(" Sobre Black Bolt ", "", 4990, "tcg-pokemon", "Sobre", "Inglés", null, null,
+        return new DatosProducto(" Sobre Black Bolt ", "", 4990, "tcg", "Sobre", "Inglés", null, null,
                 "Pokémon", null, codigo, limite, false, imagenes);
     }
 
@@ -48,6 +48,17 @@ class ProductoTest {
     @ValueSource(strings = {"7801234567891", "96385075", "12345", "78012345678ab", "12345678901234"})
     void codigosInvalidos(String codigo) {
         assertThat(CodigoBarras.esValido(codigo)).isFalse();
+    }
+
+    @Test
+    void eanInterno_esUnEan13ValidoConPrefijo200() {
+        assertThat(CodigoBarras.eanInterno(1)).isEqualTo("2000000000015");
+        assertThat(CodigoBarras.eanInterno(1000)).startsWith("200000001000").hasSize(13);
+        for (long n : new long[] {1, 7, 1000, 123_456_789, 999_999_999}) {
+            assertThat(CodigoBarras.esValido(CodigoBarras.eanInterno(n))).as("correlativo " + n).isTrue();
+        }
+        assertThatThrownBy(() -> CodigoBarras.eanInterno(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> CodigoBarras.eanInterno(1_000_000_000L)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -136,7 +147,7 @@ class ProductoTest {
     // ---------- aprobación ----------
 
     static DatosProducto publicado() {
-        return new DatosProducto("Sobre", null, 4990, "tcg-pokemon", null, null, null, null, null, null, null, null,
+        return new DatosProducto("Sobre", null, 4990, "tcg", null, null, null, null, null, null, null, null,
                 true, List.of());
     }
 

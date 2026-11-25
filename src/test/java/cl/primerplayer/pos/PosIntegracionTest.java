@@ -60,7 +60,7 @@ class PosIntegracionTest {
         String ean = TokensDePrueba.ean13();
         long id = jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id, stock, publicado, codigo_barras, limite_por_cliente)
-                VALUES (?, ?, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'), ?, ?, ?, ?) RETURNING id
+                VALUES (?, ?, (SELECT id FROM categoria WHERE slug = 'tcg'), ?, ?, ?, ?) RETURNING id
                 """, Long.class, "Sobre POS " + ean, precio, stock, publicado, ean, limite);
         return new Prod(id, ean);
     }

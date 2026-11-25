@@ -70,6 +70,15 @@ class CuentaClienteIntegracionTest {
         return json(post("/api/v1/auth/login"), "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password));
     }
 
+    ResultActions verificar(String email, String codigo) throws Exception {
+        return json(post("/api/v1/auth/verificacion"), "{\"email\":\"%s\",\"codigo\":\"%s\"}".formatted(email, codigo));
+    }
+
+    ResultActions restablecer(String email, String codigo, String password) throws Exception {
+        return json(post("/api/v1/auth/restablecimiento"),
+                "{\"email\":\"%s\",\"codigo\":\"%s\",\"password\":\"%s\"}".formatted(email, codigo, password));
+    }
+
     String accessToken(String email, String password) throws Exception {
         return JsonPath.read(login(email, password).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(),
                 "$.accessToken");
@@ -78,25 +87,25 @@ class CuentaClienteIntegracionTest {
     // ---------- verificación de correo ----------
 
     @Test
-    void registro_enviaCorreoYElEnlaceVerificaUnaSolaVez() throws Exception {
+    void registro_enviaCorreoYElCodigoVerificaUnaSolaVez() throws Exception {
         String email = email();
         registrar(email, "Pikachu2026!");
         await().atMost(ESPERA).until(() -> !correos.para(email).isEmpty());
-        String token = correos.token(email, "Bienvenido");
-        assertThat(correos.para(email).getFirst().texto()).contains("/cuenta/verificar?token=");
+        String codigo = correos.codigo(email, "Bienvenido");
+        assertThat(correos.para(email).getFirst().texto()).contains(codigo).doesNotContain("http");
 
         String acceso = accessToken(email, "Pikachu2026!");
         con(acceso, get("/api/v1/me")).andExpect(jsonPath("$.emailVerified").value(false));
 
-        json(post("/api/v1/auth/verificacion"), "{\"token\":\"" + token + "\"}").andExpect(status().isNoContent());
+        verificar(email, codigo).andExpect(status().isNoContent());
         con(acceso, get("/api/v1/me"))
                 .andExpect(jsonPath("$.emailVerified").value(true))
                 .andExpect(jsonPath("$.name").value("Ash Ketchum"))
                 .andExpect(jsonPath("$.role").value("usuario"))
                 .andExpect(jsonPath("$.memberSince").exists());
 
-        json(post("/api/v1/auth/verificacion"), "{\"token\":\"" + token + "\"}")
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-token"));
+        verificar(email, codigo)
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-code"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM correo_enviado WHERE destino = ? AND plantilla = 'verificacion-cuenta'",
                 Integer.class, email)).isEqualTo(1);
     }
@@ -110,11 +119,14 @@ class CuentaClienteIntegracionTest {
 
         con(acceso, post("/api/v1/me/verificacion")).andExpect(status().isAccepted());
         await().atMost(ESPERA).until(() -> correos.para(email).size() == 2);
-        // solo sirve el enlace del último correo
-        json(post("/api/v1/auth/verificacion"), "{\"token\":\"" + correos.token(email, "Bienvenido") + "\"}")
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-token"));
-        json(post("/api/v1/auth/verificacion"), "{\"token\":\"" + correos.token(email, "Verifica") + "\"}")
-                .andExpect(status().isNoContent());
+        // solo sirve el código del último correo
+        String primero = correos.codigo(email, "Bienvenido");
+        String ultimo = correos.codigo(email, "verificar el correo");
+        if (!primero.equals(ultimo)) {   // (1 en un millón de que coincidan)
+            verificar(email, primero)
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-code"));
+        }
+        verificar(email, ultimo).andExpect(status().isNoContent());
         con(acceso, post("/api/v1/me/verificacion"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("already-verified"));
     }
@@ -130,12 +142,12 @@ class CuentaClienteIntegracionTest {
         registrar(email, "Pikachu2026!");
         login(email, "Pikachu2026!").andExpect(status().isOk());
         json(post("/api/v1/auth/recuperacion"), "{\"email\":\"" + email.toUpperCase() + "\"}").andExpect(status().isAccepted());
-        await().atMost(ESPERA).until(() -> correos.para(email).stream().anyMatch(c -> c.asunto().contains("Restablece")));
-        String token = correos.token(email, "Restablece");
+        await().atMost(ESPERA).until(() -> correos.para(email).stream().anyMatch(c -> c.asunto().contains("restablecer")));
+        String codigo = correos.codigo(email, "restablecer");
 
-        json(post("/api/v1/auth/restablecimiento"), "{\"token\":\"%s\",\"password\":\"corta\"}".formatted(token))
-                .andExpect(status().isBadRequest());
-        json(post("/api/v1/auth/restablecimiento"), "{\"token\":\"%s\",\"password\":\"NuevaClave2026!\"}".formatted(token))
+        restablecer(email, codigo, "corta").andExpect(status().isBadRequest());
+        // Con espacios (como se lee en el correo) y el correo en mayúsculas también sirve
+        restablecer(email.toUpperCase(), codigo.substring(0, 3) + " " + codigo.substring(3), "NuevaClave2026!")
                 .andExpect(status().isNoContent());
         login(email, "Pikachu2026!").andExpect(status().isUnauthorized());
         login(email, "NuevaClave2026!").andExpect(status().isOk());
@@ -144,8 +156,38 @@ class CuentaClienteIntegracionTest {
                 WHERE u.email = ? AND r.revocado_en IS NULL""", Integer.class, email)).isEqualTo(1);   // solo la nueva
         assertThat(correos.para(desconocido)).isEmpty();
 
-        json(post("/api/v1/auth/restablecimiento"), "{\"token\":\"%s\",\"password\":\"OtraClave2026!\"}".formatted(token))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-token"));
+        restablecer(email, codigo, "OtraClave2026!")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-code"));
+        // Un correo no registrado responde igual (no revela cuentas)
+        restablecer(desconocido, codigo, "OtraClave2026!")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-code"));
+    }
+
+    @Test
+    void codigo_alQuintoErrorVence_yTras10ErroresEnUnaHoraSeBloquea() throws Exception {
+        String email = email();
+        registrar(email, "Pikachu2026!");
+        await().atMost(ESPERA).until(() -> !correos.para(email).isEmpty());
+        String bueno = correos.codigo(email, "Bienvenido");
+        String malo = bueno.equals("000000") ? "111111" : "000000";
+
+        for (int i = 0; i < 5; i++) {
+            verificar(email, malo).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-code"));
+        }
+        // Al 5º error el código venció: ya no sirve ni el correcto
+        verificar(email, bueno).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-code"));
+
+        // Pedir otro código da 5 intentos más, pero el tope de la hora (10) corta antes de poder seguir adivinando
+        String acceso = accessToken(email, "Pikachu2026!");
+        con(acceso, post("/api/v1/me/verificacion")).andExpect(status().isAccepted());
+        await().atMost(ESPERA).until(() -> correos.para(email).size() == 2);
+        for (int i = 0; i < 5; i++) {
+            verificar(email, malo).andExpect(status().isBadRequest());
+        }
+        verificar(email, correos.codigo(email, "verificar el correo"))
+                .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.code").value("too-many-attempts"));
+
+        verificar(email, "12a456").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-code"));
     }
 
     // ---------- perfil y contraseña ----------
@@ -206,7 +248,7 @@ class CuentaClienteIntegracionTest {
     long producto(int stock, boolean publicado) {
         return jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id, stock, publicado)
-                VALUES (?, 4990, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'), ?, ?) RETURNING id
+                VALUES (?, 4990, (SELECT id FROM categoria WHERE slug = 'tcg'), ?, ?) RETURNING id
                 """, Long.class, "Producto cuenta " + UUID.randomUUID().toString().substring(0, 5), stock, publicado);
     }
 
@@ -240,7 +282,7 @@ class CuentaClienteIntegracionTest {
                 "{\"delta\":5,\"motivo\":\"Llegó reposición\"}").andExpect(status().isOk());
 
         await().atMost(ESPERA).until(() -> correos.para(c.email()).stream().anyMatch(m -> m.asunto().startsWith("Volvió el stock")));
-        assertThat(correos.para(c.email()).getFirst().texto()).contains("/producto/" + agotado);
+        assertThat(correos.para(c.email()).getFirst().texto()).doesNotContain("http").doesNotContain("/producto/");
         mvc.perform(get("/api/v1/me/alertas-stock").header(HttpHeaders.AUTHORIZATION, c.bearer()))
                 .andExpect(jsonPath("$[0].notifiedAt").exists());
     }

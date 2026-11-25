@@ -71,9 +71,9 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void buscar_soloPublicadosYNoEliminados() throws Exception {
-        long publicado = visible("Sobre visible", "tcg-pokemon", "sobres", 4990, 5);
-        long oculto = producto("Sobre oculto", "tcg-pokemon", "sobres", "Español", "Pokémon", 4990, 5, 10, false, 5);
-        long eliminado = visible("Sobre eliminado", "tcg-pokemon", "sobres", 4990, 5);
+        long publicado = visible("Sobre visible", "tcg", "sobres", 4990, 5);
+        long oculto = producto("Sobre oculto", "tcg", "sobres", "Español", "Pokémon", 4990, 5, 10, false, 5);
+        long eliminado = visible("Sobre eliminado", "tcg", "sobres", 4990, 5);
         jdbc.update("UPDATE producto SET eliminado_en = now() WHERE id = ?", eliminado);
 
         mvc.perform(get(BASE).param("marca", marca))
@@ -88,14 +88,14 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void buscar_formaDelProductDelFrontend() throws Exception {
-        long id = visible("Elite Trainer Box", "tcg-pokemon", "cajas", 59990, 3);
+        long id = visible("Elite Trainer Box", "tcg", "cajas", 59990, 3);
         jdbc.update("INSERT INTO producto_imagen (producto_id, posicion, url_externa, es_portada) VALUES (?, 0, ?, false), (?, 1, ?, true)",
                 id, "https://cdn.test/b.webp", id, "https://cdn.test/a.webp");
 
         mvc.perform(get(BASE).param("marca", marca))
                 .andExpect(jsonPath("$.content[0].id").value((int) id))
                 .andExpect(jsonPath("$.content[0].precio").value(59990))
-                .andExpect(jsonPath("$.content[0].categoria").value("tcg-pokemon"))
+                .andExpect(jsonPath("$.content[0].categoria").value("tcg"))
                 .andExpect(jsonPath("$.content[0].franquicia").value("Pokémon"))
                 .andExpect(jsonPath("$.content[0].limitePorUsuario").value(2))
                 .andExpect(jsonPath("$.content[0].stock").value(3))
@@ -107,27 +107,25 @@ class CatalogoPublicoIntegracionTest {
     }
 
     @Test
-    void buscar_categoriaAgrupadoraIncluyeSusHojasYTodosNoFiltra() throws Exception {
-        long naruto = visible("Figura Naruto", "figuras-naruto", "figura", 24990, 2);
-        long goku = visible("Figura Goku", "figuras-dragon-ball", "figura", 28990, 2);
-        long sobre = visible("Sobre", "tcg-pokemon", "sobres", 4990, 2);
+    void buscar_porCategoriaGeneral_yTodosNoFiltra() throws Exception {
+        long naruto = visible("Figura Naruto", "figuras", "figura", 24990, 2);
+        long goku = visible("Figura Goku", "figuras", "figura", 28990, 2);
+        long sobre = visible("Sobre", "tcg", "sobres", 4990, 2);
 
         mvc.perform(get(BASE).param("marca", marca).param("categoria", "figuras"))
                 .andExpect(jsonPath("$.content[*].id", containsInAnyOrder((int) naruto, (int) goku)));
-        mvc.perform(get(BASE).param("marca", marca).param("categoria", "figuras-naruto"))
-                .andExpect(jsonPath("$.content[*].id", contains((int) naruto)));
         mvc.perform(get(BASE).param("marca", marca).param("categoria", "todos"))
                 .andExpect(jsonPath("$.totalElements").value(3));
         mvc.perform(get(BASE).param("marca", marca).param("categoria", "no-existe"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
-        mvc.perform(get(BASE).param("marca", marca).param("categoria", "tcg-pokemon"))
+        mvc.perform(get(BASE).param("marca", marca).param("categoria", "tcg"))
                 .andExpect(jsonPath("$.content[*].id", contains((int) sobre)));
     }
 
     @Test
     void buscar_textoSinTildesNiMayusculas() throws Exception {
-        long id = visible("Peluche Pokémon Ñandú", "figuras-pokemon", "peluche", 16990, 4);
-        visible("Mazo Charizard", "tcg-pokemon", "mazos", 24990, 4);
+        long id = visible("Peluche Pokémon Ñandú", "figuras", "peluche", 16990, 4);
+        visible("Mazo Charizard", "tcg", "mazos", 24990, 4);
 
         mvc.perform(get(BASE).param("marca", marca).param("q", "POKEMON nandu"))
                 .andExpect(jsonPath("$.content[*].id", contains((int) id)));
@@ -135,10 +133,10 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void buscar_enStockYRangoDePrecio() throws Exception {
-        long barato = visible("Barato", "tcg-pokemon", "sobres", 2990, 1);
-        visible("Agotado", "tcg-pokemon", "sobres", 3990, 0);
-        long medio = visible("Medio", "tcg-pokemon", "sobres", 9990, 7);
-        visible("Caro", "tcg-pokemon", "cajas", 59990, 2);
+        long barato = visible("Barato", "tcg", "sobres", 2990, 1);
+        visible("Agotado", "tcg", "sobres", 3990, 0);
+        long medio = visible("Medio", "tcg", "sobres", 9990, 7);
+        visible("Caro", "tcg", "cajas", 59990, 2);
 
         mvc.perform(get(BASE).param("marca", marca).param("enStock", "true").param("precioMax", "10000"))
                 .andExpect(jsonPath("$.content[*].id", containsInAnyOrder((int) barato, (int) medio)));
@@ -148,9 +146,9 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void buscar_ordenesDeLaListaBlanca() throws Exception {
-        long a = producto("A", "tcg-pokemon", "sobres", "Español", null, 9990, 3, 50, true, 30);
-        long b = producto("B", "tcg-pokemon", "sobres", "Español", null, 1990, 3, 90, true, 1);
-        long c = producto("C", "tcg-pokemon", "sobres", "Español", null, 4990, 3, 10, true, 10);
+        long a = producto("A", "tcg", "sobres", "Español", null, 9990, 3, 50, true, 30);
+        long b = producto("B", "tcg", "sobres", "Español", null, 1990, 3, 90, true, 1);
+        long c = producto("C", "tcg", "sobres", "Español", null, 4990, 3, 10, true, 10);
 
         mvc.perform(get(BASE).param("marca", marca))   // recomendados por defecto
                 .andExpect(jsonPath("$.content[*].id", contains((int) b, (int) a, (int) c)));
@@ -165,7 +163,7 @@ class CatalogoPublicoIntegracionTest {
     @Test
     void buscar_paginacion() throws Exception {
         for (int i = 0; i < 5; i++) {
-            visible("P" + i, "tcg-pokemon", "sobres", 1000 + i, 1);
+            visible("P" + i, "tcg", "sobres", 1000 + i, 1);
         }
         mvc.perform(get(BASE).param("marca", marca).param("page", "2").param("size", "2"))
                 .andExpect(jsonPath("$.content", hasSize(1)))
@@ -175,10 +173,10 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void buscar_facetasSinSuPropioFiltro() throws Exception {
-        visible("S1", "tcg-pokemon", "sobres", 4990, 1);
-        visible("S2", "tcg-pokemon", "sobres", 6990, 1);
-        visible("C1", "tcg-pokemon", "cajas", 59990, 1);
-        producto("I1", "tcg-pokemon", "sobres", "Inglés", "One Piece", 3990, 1, 10, true, 5);
+        visible("S1", "tcg", "sobres", 4990, 1);
+        visible("S2", "tcg", "sobres", 6990, 1);
+        visible("C1", "tcg", "cajas", 59990, 1);
+        producto("I1", "tcg", "sobres", "Inglés", "One Piece", 3990, 1, 10, true, 5);
 
         // Filtrando tipo=sobres: la faceta "tipo" sigue mostrando "cajas" (no aplica su propio filtro),
         // pero las demás facetas y el rango de precio sí respetan tipo=sobres.
@@ -216,9 +214,9 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void destacados_porPopularidadYSoloVisibles() throws Exception {
-        long top = producto("Top", "tcg-pokemon", "sobres", "Español", null, 4990, 3, 10_000_001, true, 5);
-        long segundo = producto("Segundo", "tcg-pokemon", "sobres", "Español", null, 4990, 3, 10_000_000, true, 5);
-        producto("Oculto popular", "tcg-pokemon", "sobres", "Español", null, 4990, 3, 20_000_000, false, 5);
+        long top = producto("Top", "tcg", "sobres", "Español", null, 4990, 3, 10_000_001, true, 5);
+        long segundo = producto("Segundo", "tcg", "sobres", "Español", null, 4990, 3, 10_000_000, true, 5);
+        producto("Oculto popular", "tcg", "sobres", "Español", null, 4990, 3, 20_000_000, false, 5);
 
         mvc.perform(get(BASE + "/destacados").param("limit", "2"))
                 .andExpect(status().isOk())
@@ -229,9 +227,9 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void detalle_visible200_ocultoOEliminado404ItemUnavailable() throws Exception {
-        long visible = visible("Visible", "tcg-pokemon", "sobres", 4990, 3);
-        long oculto = producto("Oculto", "tcg-pokemon", "sobres", "Español", null, 4990, 3, 1, false, 5);
-        long eliminado = visible("Eliminado", "tcg-pokemon", "sobres", 4990, 3);
+        long visible = visible("Visible", "tcg", "sobres", 4990, 3);
+        long oculto = producto("Oculto", "tcg", "sobres", "Español", null, 4990, 3, 1, false, 5);
+        long eliminado = visible("Eliminado", "tcg", "sobres", 4990, 3);
         jdbc.update("UPDATE producto SET eliminado_en = now() WHERE id = ?", eliminado);
 
         mvc.perform(get(BASE + "/" + visible)).andExpect(status().isOk()).andExpect(jsonPath("$.nombre").value("Visible"));
@@ -243,10 +241,10 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void relacionados_mismaCategoriaPrimeroLuegoFranquicia() throws Exception {
-        long base = producto("Base", "figuras-pokemon", "figura", "Español", "Pokémon", 19990, 3, 10, true, 5);
-        long mismaCategoria = producto("Misma cat", "figuras-pokemon", "figura", "Español", "Naruto", 19990, 3, 5_000_000, true, 5);
-        long mismaFranquicia = producto("Misma franq", "tcg-pokemon", "sobres", "Español", "Pokémon", 4990, 3, 999_999, true, 5);
-        long oculto = producto("Oculto", "figuras-pokemon", "figura", "Español", "Pokémon", 19990, 3, 10, false, 5);
+        long base = producto("Base", "figuras", "figura", "Español", "Pokémon", 19990, 3, 10, true, 5);
+        long mismaCategoria = producto("Misma cat", "figuras", "figura", "Español", "Naruto", 19990, 3, 5_000_000, true, 5);
+        long mismaFranquicia = producto("Misma franq", "tcg", "sobres", "Español", "Pokémon", 4990, 3, 999_999, true, 5);
+        long oculto = producto("Oculto", "figuras", "figura", "Español", "Pokémon", 19990, 3, 10, false, 5);
 
         mvc.perform(get(BASE + "/" + base + "/relacionados").param("limit", "12"))
                 .andExpect(status().isOk())
@@ -262,7 +260,7 @@ class CatalogoPublicoIntegracionTest {
 
     @Test
     void seguridad_todosLosRolesYAnonimoPuedenLeerElCatalogo() throws Exception {
-        long id = visible("Público", "tcg-pokemon", "sobres", 4990, 3);
+        long id = visible("Público", "tcg", "sobres", 4990, 3);
         UsuarioConToken[] usuarios = {
                 null,
                 TokensDePrueba.crear(jdbc, encoder, Rol.CLIENTE),

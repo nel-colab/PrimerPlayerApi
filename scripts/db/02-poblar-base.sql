@@ -105,51 +105,19 @@ CREATE TEMP SEQUENCE demo_pedido_tmp;               -- código provisorio; al fi
 CREATE TEMP SEQUENCE demo_boleta START 104501;      -- números de boleta de débito/crédito/prepago
 
 -- =====================================================================================================
--- 1. Datos base (los mismos de V6: categorías, franquicias, configuración y cliente de mostrador)
+-- 1. Datos base (los mismos de V6 + V13: categorías, franquicias, configuración y cliente de mostrador)
 -- =====================================================================================================
 INSERT INTO config_inventario (id, umbral_stock_bajo) VALUES (1, 3) ON CONFLICT (id) DO NOTHING;
 
+-- Categorías generales (V13): la subdivisión va por franquicia (TCG, Figuras), plataforma (Videojuegos)
+-- o tipo (Consolas: Venta/Usadas/Arriendo; Accesorios). 'todos' es solo navegación.
 INSERT INTO categoria (slug, titulo, parent_id, es_hoja, orden) VALUES
-  ('todos',               'Todos',                  NULL, FALSE, 0),
-  ('figuras',             'Figuras',                NULL, FALSE, 20),
-  ('venta-videojuegos',   'Videojuegos',            NULL, FALSE, 30),
-  ('accesorios-consolas', 'Accesorios de consolas', NULL, FALSE, 40),
-  ('tcg-pokemon',          'TCG Pokémon',           NULL, TRUE, 1),
-  ('tcg-one-piece',        'TCG One Piece',         NULL, TRUE, 2),
-  ('tcg-mitos-y-leyendas', 'TCG Mitos y Leyendas',  NULL, TRUE, 3),
-  ('tcg-yu-gi-oh',         'TCG Yu-Gi-Oh!',         NULL, TRUE, 4),
-  ('venta-consolas',       'Venta de consolas',     NULL, TRUE, 10),
-  ('consolas-usadas',      'Consolas usadas',       NULL, TRUE, 11),
-  ('arriendo-consolas',    'Arriendo de consolas',  NULL, TRUE, 12)
-ON CONFLICT (slug) DO NOTHING;
-
-INSERT INTO categoria (slug, titulo, parent_id, es_hoja, orden)
-SELECT v.slug, v.titulo, (SELECT id FROM categoria WHERE slug = v.padre), TRUE, v.orden
-FROM (VALUES
-  ('figuras-naruto',           'Naruto',           'figuras', 1),
-  ('figuras-one-piece',        'One Piece',        'figuras', 2),
-  ('figuras-pokemon',          'Pokémon',          'figuras', 3),
-  ('figuras-dragon-ball',      'Dragon Ball',      'figuras', 4),
-  ('figuras-demon-slayer',     'Demon Slayer',     'figuras', 5),
-  ('figuras-jujutsu-kaisen',   'Jujutsu Kaisen',   'figuras', 6),
-  ('figuras-my-hero-academia', 'My Hero Academia', 'figuras', 7),
-  ('figuras-attack-on-titan',  'Attack on Titan',  'figuras', 8),
-  ('figuras-hunter-x-hunter',  'Hunter x Hunter',  'figuras', 9),
-  ('figuras-bleach',           'Bleach',           'figuras', 10),
-  ('figuras-funko-pop',        'Funko Pop',        'figuras', 11),
-  ('figuras-otras',            'Otras figuras',    'figuras', 12),
-  ('juegos-ps5',               'PS5',              'venta-videojuegos', 1),
-  ('juegos-ps4',               'PS4',              'venta-videojuegos', 2),
-  ('juegos-xbox-series',       'Xbox Series',      'venta-videojuegos', 3),
-  ('juegos-xbox-one',          'Xbox One',         'venta-videojuegos', 4),
-  ('juegos-switch',            'Switch',           'venta-videojuegos', 5),
-  ('juegos-switch-2',          'Switch 2',         'venta-videojuegos', 6),
-  ('juegos-retro',             'Retro',            'venta-videojuegos', 7),
-  ('accesorios-controles',     'Controles',        'accesorios-consolas', 1),
-  ('accesorios-audifonos',     'Audífonos',        'accesorios-consolas', 2),
-  ('accesorios-fundas',        'Fundas',           'accesorios-consolas', 3),
-  ('accesorios-cargadores',    'Cargadores',       'accesorios-consolas', 4)
-) AS v(slug, titulo, padre, orden)
+  ('todos',               'Todos',       NULL, FALSE, 0),
+  ('tcg',                 'TCG',         NULL, TRUE,  10),
+  ('figuras',             'Figuras',     NULL, TRUE,  20),
+  ('venta-videojuegos',   'Videojuegos', NULL, TRUE,  30),
+  ('consolas',            'Consolas',    NULL, TRUE,  40),
+  ('accesorios-consolas', 'Accesorios',  NULL, TRUE,  50)
 ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO franquicia (nombre) VALUES
@@ -277,7 +245,7 @@ CREATE TEMP TABLE demo_producto (
 INSERT INTO demo_producto (nombre, precio, categoria, tipo, idioma, marca, plataforma, franquicia, linea,
                            limite, stock, popularidad, dias, descripcion)
 VALUES
-  ('Sobre Pokémon Tinieblas Umbrías (Español)', 6990, 'tcg-pokemon', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 37, 47, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Tinieblas Umbrías (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Tinieblas Umbrías (Español)', 6990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 37, 47, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Tinieblas Umbrías (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Tinieblas Umbrías (Español)
@@ -287,7 +255,7 @@ VALUES
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Tinieblas Umbrías (Inglés)', 6990, 'tcg-pokemon', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 74, 54, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Tinieblas Umbrías (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Tinieblas Umbrías (Inglés)', 6990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 74, 54, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Tinieblas Umbrías (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Tinieblas Umbrías (Inglés)
@@ -297,7 +265,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Phantasmal Flames (Español)', 6990, 'tcg-pokemon', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 11, 1, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Phantasmal Flames (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Phantasmal Flames (Español)', 6990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 11, 1, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Phantasmal Flames (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Phantasmal Flames (Español)
@@ -307,7 +275,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Phantasmal Flames (Inglés)', 6990, 'tcg-pokemon', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 48, 8, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Phantasmal Flames (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Phantasmal Flames (Inglés)', 6990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 48, 8, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Phantasmal Flames (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Phantasmal Flames (Inglés)
@@ -317,7 +285,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Chaos Rising (Español)', 6990, 'tcg-pokemon', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 85, 15, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Chaos Rising (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Chaos Rising (Español)', 6990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 85, 15, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Chaos Rising (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Chaos Rising (Español)
@@ -327,7 +295,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Chaos Rising (Inglés)', 6990, 'tcg-pokemon', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 22, 22, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Chaos Rising (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Chaos Rising (Inglés)', 6990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 22, 22, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Chaos Rising (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Chaos Rising (Inglés)
@@ -337,7 +305,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Ascended Heroes (Español)', 6990, 'tcg-pokemon', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 59, 29, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Ascended Heroes (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Ascended Heroes (Español)', 6990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 59, 29, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Ascended Heroes (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Ascended Heroes (Español)
@@ -347,7 +315,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Ascended Heroes (Inglés)', 6990, 'tcg-pokemon', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 96, 36, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Ascended Heroes (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Ascended Heroes (Inglés)', 6990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 96, 36, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Ascended Heroes (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Ascended Heroes (Inglés)
@@ -357,7 +325,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Mega Evolution (Español)', 6990, 'tcg-pokemon', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 33, 43, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Mega Evolution (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Mega Evolution (Español)', 6990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 33, 43, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Mega Evolution (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Mega Evolution (Español)
@@ -367,7 +335,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Mega Evolution (Inglés)', 6990, 'tcg-pokemon', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 70, 50, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Mega Evolution (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Mega Evolution (Inglés)', 6990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 70, 50, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Mega Evolution (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Mega Evolution (Inglés)
@@ -377,7 +345,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Black Bolt (Español)', 6990, 'tcg-pokemon', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', 8, 2, 7, 57, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Black Bolt (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Black Bolt (Español)', 6990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Pokémon', 'TCG', 8, 2, 7, 57, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Black Bolt (Español). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Black Bolt (Español)
@@ -387,7 +355,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Pokémon Black Bolt (Inglés)', 6990, 'tcg-pokemon', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', 8, 3, 44, 4, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Black Bolt (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
+  ('Sobre Pokémon Black Bolt (Inglés)', 6990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', 8, 3, 44, 4, 'Abre nuevas posibilidades para tu colección con Sobre Pokémon Black Bolt (Inglés). Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Pokémon.
 
 ## Detalles
 - Producto: Sobre Pokémon Black Bolt (Inglés)
@@ -397,7 +365,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mazo Mega League Battler Mewtwo ex', 34990, 'tcg-pokemon', 'mazos', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 81, 11, 'Prepárate para jugar con Mazo Mega League Battler Mewtwo ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Mazo Mega League Battler Mewtwo ex', 34990, 'tcg', 'mazos', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 81, 11, 'Prepárate para jugar con Mazo Mega League Battler Mewtwo ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Mazo Mega League Battler Mewtwo ex
@@ -407,7 +375,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Build & Battle Pokémon Chaos Rising', 34990, 'tcg-pokemon', 'mazos', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 18, 18, 'Prepárate para jugar con Build & Battle Pokémon Chaos Rising, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Build & Battle Pokémon Chaos Rising', 34990, 'tcg', 'mazos', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 18, 18, 'Prepárate para jugar con Build & Battle Pokémon Chaos Rising, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Build & Battle Pokémon Chaos Rising
@@ -417,7 +385,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mazo Battle Deck Charizard ex', 24990, 'tcg-pokemon', 'mazos', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 55, 25, 'Prepárate para jugar con Mazo Battle Deck Charizard ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Mazo Battle Deck Charizard ex', 24990, 'tcg', 'mazos', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 55, 25, 'Prepárate para jugar con Mazo Battle Deck Charizard ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Mazo Battle Deck Charizard ex
@@ -427,7 +395,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mazo Battle Deck Lucario ex', 24990, 'tcg-pokemon', 'mazos', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 92, 32, 'Prepárate para jugar con Mazo Battle Deck Lucario ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Mazo Battle Deck Lucario ex', 24990, 'tcg', 'mazos', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 92, 32, 'Prepárate para jugar con Mazo Battle Deck Lucario ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Mazo Battle Deck Lucario ex
@@ -437,7 +405,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mazo de Inicio Mega Evolution', 19990, 'tcg-pokemon', 'mazos', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 29, 39, 'Prepárate para jugar con Mazo de Inicio Mega Evolution, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Mazo de Inicio Mega Evolution', 19990, 'tcg', 'mazos', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 29, 39, 'Prepárate para jugar con Mazo de Inicio Mega Evolution, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Mazo de Inicio Mega Evolution
@@ -447,7 +415,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mazo Liga Gardevoir ex', 29990, 'tcg-pokemon', 'mazos', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 66, 46, 'Prepárate para jugar con Mazo Liga Gardevoir ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Mazo Liga Gardevoir ex', 29990, 'tcg', 'mazos', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 66, 46, 'Prepárate para jugar con Mazo Liga Gardevoir ex, una opción para quienes quieren llevar su pasión por Pokémon directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Mazo Liga Gardevoir ex
@@ -457,7 +425,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Elite Trainer Box Phantasmal Flames', 59990, 'tcg-pokemon', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', 2, 5, 3, 53, 'Dale un impulso a tu colección con Elite Trainer Box Phantasmal Flames. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Elite Trainer Box Phantasmal Flames', 59990, 'tcg', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', 2, 5, 3, 53, 'Dale un impulso a tu colección con Elite Trainer Box Phantasmal Flames. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Elite Trainer Box Phantasmal Flames
@@ -467,7 +435,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Elite Trainer Box Ascended Heroes', 64990, 'tcg-pokemon', 'cajas', 'Español', NULL, NULL, 'Pokémon', 'TCG', 2, 1, 40, 0, 'Dale un impulso a tu colección con Elite Trainer Box Ascended Heroes. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Elite Trainer Box Ascended Heroes', 64990, 'tcg', 'cajas', 'Español', NULL, NULL, 'Pokémon', 'TCG', 2, 1, 40, 0, 'Dale un impulso a tu colección con Elite Trainer Box Ascended Heroes. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Elite Trainer Box Ascended Heroes
@@ -477,7 +445,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Elite Trainer Box Mega Evolution', 59990, 'tcg-pokemon', 'cajas', 'Español', NULL, NULL, 'Pokémon', 'TCG', 2, 2, 77, 7, 'Dale un impulso a tu colección con Elite Trainer Box Mega Evolution. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Elite Trainer Box Mega Evolution', 59990, 'tcg', 'cajas', 'Español', NULL, NULL, 'Pokémon', 'TCG', 2, 2, 77, 7, 'Dale un impulso a tu colección con Elite Trainer Box Mega Evolution. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Elite Trainer Box Mega Evolution
@@ -487,7 +455,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Elite Trainer Box Chaos Rising', 59990, 'tcg-pokemon', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', 2, 3, 14, 14, 'Dale un impulso a tu colección con Elite Trainer Box Chaos Rising. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Elite Trainer Box Chaos Rising', 59990, 'tcg', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', 2, 3, 14, 14, 'Dale un impulso a tu colección con Elite Trainer Box Chaos Rising. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Elite Trainer Box Chaos Rising
@@ -497,7 +465,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Booster Bundle Mega Evolution', 24990, 'tcg-pokemon', 'cajas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 51, 21, 'Dale un impulso a tu colección con Booster Bundle Mega Evolution. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Booster Bundle Mega Evolution', 24990, 'tcg', 'cajas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 51, 21, 'Dale un impulso a tu colección con Booster Bundle Mega Evolution. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Booster Bundle Mega Evolution
@@ -507,7 +475,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mega Evolution Ascended Heroes Mega Ex Box', 44990, 'tcg-pokemon', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 88, 28, 'Dale un impulso a tu colección con Mega Evolution Ascended Heroes Mega Ex Box. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Mega Evolution Ascended Heroes Mega Ex Box', 44990, 'tcg', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 88, 28, 'Dale un impulso a tu colección con Mega Evolution Ascended Heroes Mega Ex Box. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Mega Evolution Ascended Heroes Mega Ex Box
@@ -517,7 +485,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Booster Box Phantasmal Flames (36 sobres)', 189990, 'tcg-pokemon', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 25, 35, 'Dale un impulso a tu colección con Booster Box Phantasmal Flames (36 sobres). Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Booster Box Phantasmal Flames (36 sobres)', 189990, 'tcg', 'cajas', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 25, 35, 'Dale un impulso a tu colección con Booster Box Phantasmal Flames (36 sobres). Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Booster Box Phantasmal Flames (36 sobres)
@@ -527,7 +495,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Lumiose City Mini Tin Collection', 14990, 'tcg-pokemon', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 62, 42, 'Dale un impulso a tu colección con Lumiose City Mini Tin Collection. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Lumiose City Mini Tin Collection', 14990, 'tcg', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 62, 42, 'Dale un impulso a tu colección con Lumiose City Mini Tin Collection. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Lumiose City Mini Tin Collection
@@ -537,7 +505,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mini Tin Charizard', 12990, 'tcg-pokemon', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 99, 49, 'Dale un impulso a tu colección con Mini Tin Charizard. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Mini Tin Charizard', 12990, 'tcg', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 99, 49, 'Dale un impulso a tu colección con Mini Tin Charizard. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Mini Tin Charizard
@@ -547,7 +515,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Lata Coleccionable Pikachu', 17990, 'tcg-pokemon', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 36, 56, 'Dale un impulso a tu colección con Lata Coleccionable Pikachu. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Lata Coleccionable Pikachu', 17990, 'tcg', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 36, 56, 'Dale un impulso a tu colección con Lata Coleccionable Pikachu. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Lata Coleccionable Pikachu
@@ -557,7 +525,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Ascended Heroes Pin Collection First Partners', 44990, 'tcg-pokemon', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 73, 3, 'Dale un impulso a tu colección con Ascended Heroes Pin Collection First Partners. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Ascended Heroes Pin Collection First Partners', 44990, 'tcg', 'latas', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 73, 3, 'Dale un impulso a tu colección con Ascended Heroes Pin Collection First Partners. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Ascended Heroes Pin Collection First Partners
@@ -567,7 +535,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mini Portafolio Pokémon Phantasmal Flames', 10990, 'tcg-pokemon', 'portafolios', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 10, 10, 'Dale un impulso a tu colección con Mini Portafolio Pokémon Phantasmal Flames. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Mini Portafolio Pokémon Phantasmal Flames', 10990, 'tcg', 'portafolios', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 10, 10, 'Dale un impulso a tu colección con Mini Portafolio Pokémon Phantasmal Flames. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Mini Portafolio Pokémon Phantasmal Flames
@@ -577,7 +545,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Carpeta Pokémon Pikachu 9 bolsillos', 15990, 'tcg-pokemon', 'portafolios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 47, 17, 'Dale un impulso a tu colección con Carpeta Pokémon Pikachu 9 bolsillos. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Carpeta Pokémon Pikachu 9 bolsillos', 15990, 'tcg', 'portafolios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 47, 17, 'Dale un impulso a tu colección con Carpeta Pokémon Pikachu 9 bolsillos. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Carpeta Pokémon Pikachu 9 bolsillos
@@ -587,7 +555,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Álbum Pokémon 360 cartas', 21990, 'tcg-pokemon', 'portafolios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 84, 24, 'Dale un impulso a tu colección con Álbum Pokémon 360 cartas. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Álbum Pokémon 360 cartas', 21990, 'tcg', 'portafolios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 84, 24, 'Dale un impulso a tu colección con Álbum Pokémon 360 cartas. Su formato reúne una atractiva propuesta de Pokémon para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Álbum Pokémon 360 cartas
@@ -597,7 +565,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Protectores Standard Pikachu (65 un.)', 4990, 'tcg-pokemon', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 21, 31, 'Cuida y organiza tu colección con Protectores Standard Pikachu (65 un.), un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
+  ('Protectores Standard Pikachu (65 un.)', 4990, 'tcg', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 21, 31, 'Cuida y organiza tu colección con Protectores Standard Pikachu (65 un.), un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
 
 ## Detalles
 - Producto: Protectores Standard Pikachu (65 un.)
@@ -607,7 +575,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Playmat Charizard', 14990, 'tcg-pokemon', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 58, 38, 'Cuida y organiza tu colección con Playmat Charizard, un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
+  ('Playmat Charizard', 14990, 'tcg', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 58, 38, 'Cuida y organiza tu colección con Playmat Charizard, un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
 
 ## Detalles
 - Producto: Playmat Charizard
@@ -617,7 +585,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Deck Box Eevee', 9990, 'tcg-pokemon', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 95, 45, 'Cuida y organiza tu colección con Deck Box Eevee, un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
+  ('Deck Box Eevee', 9990, 'tcg', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 0, 95, 45, 'Cuida y organiza tu colección con Deck Box Eevee, un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
 
 ## Detalles
 - Producto: Deck Box Eevee
@@ -627,7 +595,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Dados y contadores Pokémon', 6990, 'tcg-pokemon', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 32, 52, 'Cuida y organiza tu colección con Dados y contadores Pokémon, un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
+  ('Dados y contadores Pokémon', 6990, 'tcg', 'accesorios', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 32, 52, 'Cuida y organiza tu colección con Dados y contadores Pokémon, un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
 
 ## Detalles
 - Producto: Dados y contadores Pokémon
@@ -637,7 +605,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Charizard ex (Obsidian Flames)', 12990, 'tcg-pokemon', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 69, 59, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Charizard ex (Obsidian Flames) destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
+  ('Charizard ex (Obsidian Flames)', 12990, 'tcg', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 69, 59, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Charizard ex (Obsidian Flames) destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
 
 ## Detalles
 - Producto: Charizard ex (Obsidian Flames)
@@ -647,7 +615,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Pikachu ex Ilustración Especial', 29990, 'tcg-pokemon', 'singles', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 6, 6, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Pikachu ex Ilustración Especial destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
+  ('Pikachu ex Ilustración Especial', 29990, 'tcg', 'singles', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 4, 6, 6, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Pikachu ex Ilustración Especial destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
 
 ## Detalles
 - Producto: Pikachu ex Ilustración Especial
@@ -657,7 +625,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mewtwo ex', 7990, 'tcg-pokemon', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 43, 13, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Mewtwo ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
+  ('Mewtwo ex', 7990, 'tcg', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 5, 43, 13, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Mewtwo ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
 
 ## Detalles
 - Producto: Mewtwo ex
@@ -667,7 +635,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Gardevoir ex', 5990, 'tcg-pokemon', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 80, 20, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Gardevoir ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
+  ('Gardevoir ex', 5990, 'tcg', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 1, 80, 20, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Gardevoir ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
 
 ## Detalles
 - Producto: Gardevoir ex
@@ -677,7 +645,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Umbreon ex', 34990, 'tcg-pokemon', 'singles', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 17, 27, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Umbreon ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
+  ('Umbreon ex', 34990, 'tcg', 'singles', 'Inglés', NULL, NULL, 'Pokémon', 'TCG', NULL, 2, 17, 27, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Umbreon ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
 
 ## Detalles
 - Producto: Umbreon ex
@@ -687,7 +655,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Lucario ex', 4990, 'tcg-pokemon', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 54, 34, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Lucario ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
+  ('Lucario ex', 4990, 'tcg', 'singles', 'Español', NULL, NULL, 'Pokémon', 'TCG', NULL, 3, 54, 34, 'Una carta individual de Pokémon para sumar una pieza especial a tu colección. Lucario ex destaca por su identidad y temática, y puede convertirse en la protagonista de tu próxima búsqueda.
 
 ## Detalles
 - Producto: Lucario ex
@@ -697,7 +665,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre One Piece Card Game OP-09', 3990, 'tcg-one-piece', 'sobres', 'Inglés', NULL, NULL, 'One Piece', 'TCG', NULL, 4, 91, 41, 'Abre nuevas posibilidades para tu colección con Sobre One Piece Card Game OP-09. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en One Piece.
+  ('Sobre One Piece Card Game OP-09', 3990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'One Piece', 'TCG', NULL, 4, 91, 41, 'Abre nuevas posibilidades para tu colección con Sobre One Piece Card Game OP-09. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en One Piece.
 
 ## Detalles
 - Producto: Sobre One Piece Card Game OP-09
@@ -707,7 +675,7 @@ Fans de Pokémon, coleccionistas y jugadores que buscan una nueva incorporación
 
 ## Ideal para
 Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre One Piece Card Game OP-10', 3990, 'tcg-one-piece', 'sobres', 'Español', NULL, NULL, 'One Piece', 'TCG', NULL, 0, 28, 48, 'Abre nuevas posibilidades para tu colección con Sobre One Piece Card Game OP-10. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en One Piece.
+  ('Sobre One Piece Card Game OP-10', 3990, 'tcg', 'sobres', 'Español', NULL, NULL, 'One Piece', 'TCG', NULL, 0, 28, 48, 'Abre nuevas posibilidades para tu colección con Sobre One Piece Card Game OP-10. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en One Piece.
 
 ## Detalles
 - Producto: Sobre One Piece Card Game OP-10
@@ -717,7 +685,7 @@ Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporació
 
 ## Ideal para
 Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mazo Inicial One Piece Luffy', 12990, 'tcg-one-piece', 'mazos', 'Inglés', NULL, NULL, 'One Piece', 'TCG', NULL, 1, 65, 55, 'Prepárate para jugar con Mazo Inicial One Piece Luffy, una opción para quienes quieren llevar su pasión por One Piece directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Mazo Inicial One Piece Luffy', 12990, 'tcg', 'mazos', 'Inglés', NULL, NULL, 'One Piece', 'TCG', NULL, 1, 65, 55, 'Prepárate para jugar con Mazo Inicial One Piece Luffy, una opción para quienes quieren llevar su pasión por One Piece directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Mazo Inicial One Piece Luffy
@@ -727,7 +695,7 @@ Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporació
 
 ## Ideal para
 Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Display One Piece OP-09 (24 sobres)', 79990, 'tcg-one-piece', 'cajas', 'Inglés', NULL, NULL, 'One Piece', 'TCG', NULL, 2, 2, 2, 'Dale un impulso a tu colección con Display One Piece OP-09 (24 sobres). Su formato reúne una atractiva propuesta de One Piece para disfrutar, coleccionar y compartir tu pasión por las cartas.
+  ('Display One Piece OP-09 (24 sobres)', 79990, 'tcg', 'cajas', 'Inglés', NULL, NULL, 'One Piece', 'TCG', NULL, 2, 2, 2, 'Dale un impulso a tu colección con Display One Piece OP-09 (24 sobres). Su formato reúne una atractiva propuesta de One Piece para disfrutar, coleccionar y compartir tu pasión por las cartas.
 
 ## Detalles
 - Producto: Display One Piece OP-09 (24 sobres)
@@ -737,7 +705,7 @@ Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporació
 
 ## Ideal para
 Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Mitos y Leyendas Espada Sagrada', 2990, 'tcg-mitos-y-leyendas', 'sobres', 'Español', NULL, NULL, 'Mitos y Leyendas', 'TCG', NULL, 3, 39, 9, 'Abre nuevas posibilidades para tu colección con Sobre Mitos y Leyendas Espada Sagrada. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Mitos y Leyendas.
+  ('Sobre Mitos y Leyendas Espada Sagrada', 2990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Mitos y Leyendas', 'TCG', NULL, 3, 39, 9, 'Abre nuevas posibilidades para tu colección con Sobre Mitos y Leyendas Espada Sagrada. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Mitos y Leyendas.
 
 ## Detalles
 - Producto: Sobre Mitos y Leyendas Espada Sagrada
@@ -747,7 +715,7 @@ Fans de One Piece, coleccionistas y jugadores que buscan una nueva incorporació
 
 ## Ideal para
 Fans de Mitos y Leyendas, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Mazo Mitos y Leyendas Helénica', 9990, 'tcg-mitos-y-leyendas', 'mazos', 'Español', NULL, NULL, 'Mitos y Leyendas', 'TCG', NULL, 4, 76, 16, 'Prepárate para jugar con Mazo Mitos y Leyendas Helénica, una opción para quienes quieren llevar su pasión por Mitos y Leyendas directamente a la mesa y disfrutar cada enfrentamiento.
+  ('Mazo Mitos y Leyendas Helénica', 9990, 'tcg', 'mazos', 'Español', NULL, NULL, 'Mitos y Leyendas', 'TCG', NULL, 4, 76, 16, 'Prepárate para jugar con Mazo Mitos y Leyendas Helénica, una opción para quienes quieren llevar su pasión por Mitos y Leyendas directamente a la mesa y disfrutar cada enfrentamiento.
 
 ## Detalles
 - Producto: Mazo Mitos y Leyendas Helénica
@@ -757,7 +725,7 @@ Fans de Mitos y Leyendas, coleccionistas y jugadores que buscan una nueva incorp
 
 ## Ideal para
 Fans de Mitos y Leyendas, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Yu-Gi-Oh! Predadores Metálicos', 4990, 'tcg-yu-gi-oh', 'sobres', 'Español', NULL, NULL, 'Yu-Gi-Oh!', 'TCG', NULL, 5, 13, 23, 'Abre nuevas posibilidades para tu colección con Sobre Yu-Gi-Oh! Predadores Metálicos. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Yu-Gi-Oh!.
+  ('Sobre Yu-Gi-Oh! Predadores Metálicos', 4990, 'tcg', 'sobres', 'Español', NULL, NULL, 'Yu-Gi-Oh!', 'TCG', NULL, 5, 13, 23, 'Abre nuevas posibilidades para tu colección con Sobre Yu-Gi-Oh! Predadores Metálicos. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Yu-Gi-Oh!.
 
 ## Detalles
 - Producto: Sobre Yu-Gi-Oh! Predadores Metálicos
@@ -767,7 +735,7 @@ Fans de Mitos y Leyendas, coleccionistas y jugadores que buscan una nueva incorp
 
 ## Ideal para
 Fans de Yu-Gi-Oh!, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Sobre Yu-Gi-Oh! Metal Raiders', 4990, 'tcg-yu-gi-oh', 'sobres', 'Inglés', NULL, NULL, 'Yu-Gi-Oh!', 'TCG', NULL, 1, 50, 30, 'Abre nuevas posibilidades para tu colección con Sobre Yu-Gi-Oh! Metal Raiders. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Yu-Gi-Oh!.
+  ('Sobre Yu-Gi-Oh! Metal Raiders', 4990, 'tcg', 'sobres', 'Inglés', NULL, NULL, 'Yu-Gi-Oh!', 'TCG', NULL, 1, 50, 30, 'Abre nuevas posibilidades para tu colección con Sobre Yu-Gi-Oh! Metal Raiders. Cada sobre invita a descubrir cartas y disfrutar la emoción de ampliar tu estrategia en Yu-Gi-Oh!.
 
 ## Detalles
 - Producto: Sobre Yu-Gi-Oh! Metal Raiders
@@ -777,7 +745,7 @@ Fans de Yu-Gi-Oh!, coleccionistas y jugadores que buscan una nueva incorporació
 
 ## Ideal para
 Fans de Yu-Gi-Oh!, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Protector Small 62x89mm Wyvern de Sangre (60 un.)', 3990, 'tcg-yu-gi-oh', 'accesorios', 'Español', NULL, NULL, 'Yu-Gi-Oh!', 'TCG', NULL, 2, 87, 37, 'Cuida y organiza tu colección con Protector Small 62x89mm Wyvern de Sangre (60 un.), un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
+  ('Protector Small 62x89mm Wyvern de Sangre (60 un.)', 3990, 'tcg', 'accesorios', 'Español', NULL, NULL, 'Yu-Gi-Oh!', 'TCG', NULL, 2, 87, 37, 'Cuida y organiza tu colección con Protector Small 62x89mm Wyvern de Sangre (60 un.), un accesorio pensado para acompañar tus partidas y mantener tus cartas listas para el próximo duelo.
 
 ## Detalles
 - Producto: Protector Small 62x89mm Wyvern de Sangre (60 un.)
@@ -787,7 +755,7 @@ Fans de Yu-Gi-Oh!, coleccionistas y jugadores que buscan una nueva incorporació
 
 ## Ideal para
 Fans de Yu-Gi-Oh!, coleccionistas y jugadores que buscan una nueva incorporación para su colección o sus partidas.'),
-  ('Naruto Uzumaki Figura Articulada', 24990, 'figuras-naruto', NULL, NULL, 'Naruto', NULL, 'Naruto', 'Figuras', NULL, 3, 24, 44, 'Lleva tu pasión por Naruto a otro nivel con Naruto Uzumaki Figura Articulada. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Naruto Uzumaki Figura Articulada', 24990, 'figuras', NULL, NULL, 'Naruto', NULL, 'Naruto', 'Figuras', NULL, 3, 24, 44, 'Lleva tu pasión por Naruto a otro nivel con Naruto Uzumaki Figura Articulada. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Naruto Uzumaki Figura Articulada
@@ -796,7 +764,7 @@ Fans de Yu-Gi-Oh!, coleccionistas y jugadores que buscan una nueva incorporació
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Naruto o encontrar un regalo con identidad.'),
-  ('Itachi Uchiha Figura Coleccionable', 29990, 'figuras-naruto', NULL, NULL, 'Naruto', NULL, 'Naruto', 'Figuras', NULL, 0, 61, 51, 'Lleva tu pasión por Naruto a otro nivel con Itachi Uchiha Figura Coleccionable. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Itachi Uchiha Figura Coleccionable', 29990, 'figuras', NULL, NULL, 'Naruto', NULL, 'Naruto', 'Figuras', NULL, 0, 61, 51, 'Lleva tu pasión por Naruto a otro nivel con Itachi Uchiha Figura Coleccionable. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Itachi Uchiha Figura Coleccionable
@@ -805,7 +773,7 @@ Coleccionistas y fans que quieren exhibir a Naruto o encontrar un regalo con ide
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Naruto o encontrar un regalo con identidad.'),
-  ('Kakashi Hatake Figura 18 cm', 22990, 'figuras-naruto', NULL, NULL, 'Naruto', NULL, 'Naruto', 'Figuras', NULL, 5, 98, 58, 'Lleva tu pasión por Naruto a otro nivel con Kakashi Hatake Figura 18 cm. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Kakashi Hatake Figura 18 cm', 22990, 'figuras', NULL, NULL, 'Naruto', NULL, 'Naruto', 'Figuras', NULL, 5, 98, 58, 'Lleva tu pasión por Naruto a otro nivel con Kakashi Hatake Figura 18 cm. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Kakashi Hatake Figura 18 cm
@@ -814,7 +782,7 @@ Coleccionistas y fans que quieren exhibir a Naruto o encontrar un regalo con ide
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Naruto o encontrar un regalo con identidad.'),
-  ('Monkey D. Luffy Gear 5 Figura', 34990, 'figuras-one-piece', NULL, NULL, 'One Piece', NULL, 'One Piece', 'Figuras', NULL, 1, 35, 5, 'Lleva tu pasión por One Piece a otro nivel con Monkey D. Luffy Gear 5 Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Monkey D. Luffy Gear 5 Figura', 34990, 'figuras', NULL, NULL, 'One Piece', NULL, 'One Piece', 'Figuras', NULL, 1, 35, 5, 'Lleva tu pasión por One Piece a otro nivel con Monkey D. Luffy Gear 5 Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Monkey D. Luffy Gear 5 Figura
@@ -823,7 +791,7 @@ Coleccionistas y fans que quieren exhibir a Naruto o encontrar un regalo con ide
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a One Piece o encontrar un regalo con identidad.'),
-  ('Roronoa Zoro Figura Coleccionable', 31990, 'figuras-one-piece', NULL, NULL, 'One Piece', NULL, 'One Piece', 'Figuras', NULL, 2, 72, 12, 'Lleva tu pasión por One Piece a otro nivel con Roronoa Zoro Figura Coleccionable. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Roronoa Zoro Figura Coleccionable', 31990, 'figuras', NULL, NULL, 'One Piece', NULL, 'One Piece', 'Figuras', NULL, 2, 72, 12, 'Lleva tu pasión por One Piece a otro nivel con Roronoa Zoro Figura Coleccionable. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Roronoa Zoro Figura Coleccionable
@@ -832,7 +800,7 @@ Coleccionistas y fans que quieren exhibir a One Piece o encontrar un regalo con 
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a One Piece o encontrar un regalo con identidad.'),
-  ('Trafalgar Law Figura 20 cm', 27990, 'figuras-one-piece', NULL, NULL, 'One Piece', NULL, 'One Piece', 'Figuras', NULL, 3, 9, 19, 'Lleva tu pasión por One Piece a otro nivel con Trafalgar Law Figura 20 cm. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Trafalgar Law Figura 20 cm', 27990, 'figuras', NULL, NULL, 'One Piece', NULL, 'One Piece', 'Figuras', NULL, 3, 9, 19, 'Lleva tu pasión por One Piece a otro nivel con Trafalgar Law Figura 20 cm. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Trafalgar Law Figura 20 cm
@@ -841,7 +809,7 @@ Coleccionistas y fans que quieren exhibir a One Piece o encontrar un regalo con 
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a One Piece o encontrar un regalo con identidad.'),
-  ('Peluche Pikachu 30 cm', 16990, 'figuras-pokemon', NULL, NULL, 'Pokémon', NULL, 'Pokémon', 'Figuras', NULL, 4, 46, 26, 'Lleva tu pasión por Pokémon a otro nivel con Peluche Pikachu 30 cm. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Peluche Pikachu 30 cm', 16990, 'figuras', NULL, NULL, 'Pokémon', NULL, 'Pokémon', 'Figuras', NULL, 4, 46, 26, 'Lleva tu pasión por Pokémon a otro nivel con Peluche Pikachu 30 cm. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Peluche Pikachu 30 cm
@@ -850,7 +818,7 @@ Coleccionistas y fans que quieren exhibir a One Piece o encontrar un regalo con 
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con identidad.'),
-  ('Figura Charizard Articulada', 19990, 'figuras-pokemon', NULL, NULL, 'Pokémon', NULL, 'Pokémon', 'Figuras', NULL, 5, 83, 33, 'Lleva tu pasión por Pokémon a otro nivel con Figura Charizard Articulada. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Figura Charizard Articulada', 19990, 'figuras', NULL, NULL, 'Pokémon', NULL, 'Pokémon', 'Figuras', NULL, 5, 83, 33, 'Lleva tu pasión por Pokémon a otro nivel con Figura Charizard Articulada. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Figura Charizard Articulada
@@ -859,7 +827,7 @@ Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con i
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con identidad.'),
-  ('Figura Eevee y Evoluciones', 24990, 'figuras-pokemon', NULL, NULL, 'Pokémon', NULL, 'Pokémon', 'Figuras', NULL, 1, 20, 40, 'Lleva tu pasión por Pokémon a otro nivel con Figura Eevee y Evoluciones. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Figura Eevee y Evoluciones', 24990, 'figuras', NULL, NULL, 'Pokémon', NULL, 'Pokémon', 'Figuras', NULL, 1, 20, 40, 'Lleva tu pasión por Pokémon a otro nivel con Figura Eevee y Evoluciones. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Figura Eevee y Evoluciones
@@ -868,7 +836,7 @@ Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con i
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con identidad.'),
-  ('Goku Ultra Instinto Figura', 28990, 'figuras-dragon-ball', NULL, NULL, 'Dragon Ball', NULL, 'Dragon Ball', 'Figuras', NULL, 2, 57, 47, 'Lleva tu pasión por Dragon Ball a otro nivel con Goku Ultra Instinto Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Goku Ultra Instinto Figura', 28990, 'figuras', NULL, NULL, 'Dragon Ball', NULL, 'Dragon Ball', 'Figuras', NULL, 2, 57, 47, 'Lleva tu pasión por Dragon Ball a otro nivel con Goku Ultra Instinto Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Goku Ultra Instinto Figura
@@ -877,7 +845,7 @@ Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con i
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Dragon Ball o encontrar un regalo con identidad.'),
-  ('Vegeta Super Saiyan Figura', 26990, 'figuras-dragon-ball', NULL, NULL, 'Dragon Ball', NULL, 'Dragon Ball', 'Figuras', NULL, 0, 94, 54, 'Lleva tu pasión por Dragon Ball a otro nivel con Vegeta Super Saiyan Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Vegeta Super Saiyan Figura', 26990, 'figuras', NULL, NULL, 'Dragon Ball', NULL, 'Dragon Ball', 'Figuras', NULL, 0, 94, 54, 'Lleva tu pasión por Dragon Ball a otro nivel con Vegeta Super Saiyan Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Vegeta Super Saiyan Figura
@@ -886,7 +854,7 @@ Coleccionistas y fans que quieren exhibir a Dragon Ball o encontrar un regalo co
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Dragon Ball o encontrar un regalo con identidad.'),
-  ('Tanjiro Kamado Figura', 25990, 'figuras-demon-slayer', NULL, NULL, 'Demon Slayer', NULL, 'Demon Slayer', 'Figuras', NULL, 4, 31, 1, 'Lleva tu pasión por Demon Slayer a otro nivel con Tanjiro Kamado Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Tanjiro Kamado Figura', 25990, 'figuras', NULL, NULL, 'Demon Slayer', NULL, 'Demon Slayer', 'Figuras', NULL, 4, 31, 1, 'Lleva tu pasión por Demon Slayer a otro nivel con Tanjiro Kamado Figura. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Tanjiro Kamado Figura
@@ -895,7 +863,7 @@ Coleccionistas y fans que quieren exhibir a Dragon Ball o encontrar un regalo co
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Demon Slayer o encontrar un regalo con identidad.'),
-  ('Funko Pop Hisoka Hunter x Hunter', 18990, 'figuras-funko-pop', NULL, NULL, 'Funko Pop', NULL, 'Hunter x Hunter', 'Figuras', NULL, 5, 68, 8, 'Lleva tu pasión por Hunter x Hunter a otro nivel con Funko Pop Hisoka Hunter x Hunter. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Funko Pop Hisoka Hunter x Hunter', 18990, 'figuras', NULL, NULL, 'Funko Pop', NULL, 'Hunter x Hunter', 'Figuras', NULL, 5, 68, 8, 'Lleva tu pasión por Hunter x Hunter a otro nivel con Funko Pop Hisoka Hunter x Hunter. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Funko Pop Hisoka Hunter x Hunter
@@ -904,7 +872,7 @@ Coleccionistas y fans que quieren exhibir a Demon Slayer o encontrar un regalo c
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Hunter x Hunter o encontrar un regalo con identidad.'),
-  ('Funko Pop Pikachu', 16990, 'figuras-funko-pop', NULL, NULL, 'Funko Pop', NULL, 'Pokémon', 'Figuras', NULL, 1, 5, 15, 'Lleva tu pasión por Pokémon a otro nivel con Funko Pop Pikachu. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
+  ('Funko Pop Pikachu', 16990, 'figuras', NULL, NULL, 'Funko Pop', NULL, 'Pokémon', 'Figuras', NULL, 1, 5, 15, 'Lleva tu pasión por Pokémon a otro nivel con Funko Pop Pikachu. Una pieza coleccionable que destaca en tu vitrina y suma personalidad a cualquier espacio.
 
 ## Detalles
 - Producto: Funko Pop Pikachu
@@ -913,7 +881,7 @@ Coleccionistas y fans que quieren exhibir a Hunter x Hunter o encontrar un regal
 
 ## Ideal para
 Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con identidad.'),
-  ('God of War Ragnarök', 39990, 'juegos-ps5', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 2, 42, 22, 'Entra de lleno en la aventura de God of War Ragnarök y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('God of War Ragnarök', 39990, 'venta-videojuegos', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 2, 42, 22, 'Entra de lleno en la aventura de God of War Ragnarök y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: God of War Ragnarök
@@ -921,7 +889,7 @@ Coleccionistas y fans que quieren exhibir a Pokémon o encontrar un regalo con i
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en PlayStation 5.'),
-  ('Spider-Man 2', 44990, 'juegos-ps5', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 3, 79, 29, 'Entra de lleno en la aventura de Spider-Man 2 y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Spider-Man 2', 44990, 'venta-videojuegos', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 3, 79, 29, 'Entra de lleno en la aventura de Spider-Man 2 y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Spider-Man 2
@@ -929,7 +897,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en PlayStation 5.'),
-  ('EA Sports FC 26', 54990, 'juegos-ps5', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 4, 16, 36, 'Entra de lleno en la aventura de EA Sports FC 26 y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('EA Sports FC 26', 54990, 'venta-videojuegos', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 4, 16, 36, 'Entra de lleno en la aventura de EA Sports FC 26 y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: EA Sports FC 26
@@ -937,7 +905,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en PlayStation 5.'),
-  ('Astro Bot', 49990, 'juegos-ps5', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 5, 53, 43, 'Entra de lleno en la aventura de Astro Bot y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Astro Bot', 49990, 'venta-videojuegos', NULL, NULL, NULL, 'PlayStation 5', NULL, 'Videojuegos', NULL, 5, 53, 43, 'Entra de lleno en la aventura de Astro Bot y disfruta tus partidas en PlayStation 5. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Astro Bot
@@ -945,7 +913,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en PlayStation 5.'),
-  ('The Last of Us Part II', 24990, 'juegos-ps4', NULL, NULL, NULL, 'PlayStation 4', NULL, 'Videojuegos', NULL, 1, 90, 50, 'Entra de lleno en la aventura de The Last of Us Part II y disfruta tus partidas en PlayStation 4. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('The Last of Us Part II', 24990, 'venta-videojuegos', NULL, NULL, NULL, 'PlayStation 4', NULL, 'Videojuegos', NULL, 1, 90, 50, 'Entra de lleno en la aventura de The Last of Us Part II y disfruta tus partidas en PlayStation 4. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: The Last of Us Part II
@@ -953,7 +921,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en PlayStation 4.'),
-  ('Ghost of Tsushima', 24990, 'juegos-ps4', NULL, NULL, NULL, 'PlayStation 4', NULL, 'Videojuegos', NULL, 0, 27, 57, 'Entra de lleno en la aventura de Ghost of Tsushima y disfruta tus partidas en PlayStation 4. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Ghost of Tsushima', 24990, 'venta-videojuegos', NULL, NULL, NULL, 'PlayStation 4', NULL, 'Videojuegos', NULL, 0, 27, 57, 'Entra de lleno en la aventura de Ghost of Tsushima y disfruta tus partidas en PlayStation 4. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Ghost of Tsushima
@@ -961,7 +929,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en PlayStation 4.'),
-  ('Mario Kart World', 69990, 'juegos-switch-2', NULL, NULL, NULL, 'Nintendo Switch 2', NULL, 'Videojuegos', NULL, 3, 64, 4, 'Entra de lleno en la aventura de Mario Kart World y disfruta tus partidas en Nintendo Switch 2. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Mario Kart World', 69990, 'venta-videojuegos', NULL, NULL, NULL, 'Nintendo Switch 2', NULL, 'Videojuegos', NULL, 3, 64, 4, 'Entra de lleno en la aventura de Mario Kart World y disfruta tus partidas en Nintendo Switch 2. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Mario Kart World
@@ -969,7 +937,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en Nintendo Switch 2.'),
-  ('Pokémon Legends: Z-A', 59990, 'juegos-switch', NULL, NULL, NULL, 'Nintendo Switch', 'Pokémon', 'Videojuegos', NULL, 4, 1, 11, 'Entra de lleno en la aventura de Pokémon Legends: Z-A y disfruta tus partidas en Nintendo Switch. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Pokémon Legends: Z-A', 59990, 'venta-videojuegos', NULL, NULL, NULL, 'Nintendo Switch', 'Pokémon', 'Videojuegos', NULL, 4, 1, 11, 'Entra de lleno en la aventura de Pokémon Legends: Z-A y disfruta tus partidas en Nintendo Switch. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Pokémon Legends: Z-A
@@ -978,7 +946,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en Nintendo Switch.'),
-  ('The Legend of Zelda: Tears of the Kingdom', 59990, 'juegos-switch', NULL, NULL, NULL, 'Nintendo Switch', NULL, 'Videojuegos', NULL, 5, 38, 18, 'Entra de lleno en la aventura de The Legend of Zelda: Tears of the Kingdom y disfruta tus partidas en Nintendo Switch. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('The Legend of Zelda: Tears of the Kingdom', 59990, 'venta-videojuegos', NULL, NULL, NULL, 'Nintendo Switch', NULL, 'Videojuegos', NULL, 5, 38, 18, 'Entra de lleno en la aventura de The Legend of Zelda: Tears of the Kingdom y disfruta tus partidas en Nintendo Switch. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: The Legend of Zelda: Tears of the Kingdom
@@ -986,7 +954,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en Nintendo Switch.'),
-  ('Super Mario Bros. Wonder', 54990, 'juegos-switch', NULL, NULL, NULL, 'Nintendo Switch', NULL, 'Videojuegos', NULL, 1, 75, 25, 'Entra de lleno en la aventura de Super Mario Bros. Wonder y disfruta tus partidas en Nintendo Switch. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Super Mario Bros. Wonder', 54990, 'venta-videojuegos', NULL, NULL, NULL, 'Nintendo Switch', NULL, 'Videojuegos', NULL, 1, 75, 25, 'Entra de lleno en la aventura de Super Mario Bros. Wonder y disfruta tus partidas en Nintendo Switch. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Super Mario Bros. Wonder
@@ -994,7 +962,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en Nintendo Switch.'),
-  ('Forza Horizon 5', 39990, 'juegos-xbox-series', NULL, NULL, NULL, 'Xbox Series X|S', NULL, 'Videojuegos', NULL, 2, 12, 32, 'Entra de lleno en la aventura de Forza Horizon 5 y disfruta tus partidas en Xbox Series X|S. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Forza Horizon 5', 39990, 'venta-videojuegos', NULL, NULL, NULL, 'Xbox Series X|S', NULL, 'Videojuegos', NULL, 2, 12, 32, 'Entra de lleno en la aventura de Forza Horizon 5 y disfruta tus partidas en Xbox Series X|S. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Forza Horizon 5
@@ -1002,7 +970,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en Xbox Series X|S.'),
-  ('Halo Infinite', 29990, 'juegos-xbox-series', NULL, NULL, NULL, 'Xbox Series X|S', NULL, 'Videojuegos', NULL, 3, 49, 39, 'Entra de lleno en la aventura de Halo Infinite y disfruta tus partidas en Xbox Series X|S. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
+  ('Halo Infinite', 29990, 'venta-videojuegos', NULL, NULL, NULL, 'Xbox Series X|S', NULL, 'Videojuegos', NULL, 3, 49, 39, 'Entra de lleno en la aventura de Halo Infinite y disfruta tus partidas en Xbox Series X|S. Una gran elección para sumar una nueva experiencia a tu colección de videojuegos.
 
 ## Detalles
 - Producto: Halo Infinite
@@ -1010,7 +978,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesión de juego en Xbox Series X|S.'),
-  ('PlayStation 5 Slim 1 TB', 599990, 'venta-consolas', 'Venta', NULL, NULL, 'PlayStation 5', NULL, 'Consolas', NULL, 4, 86, 46, 'Lleva tu experiencia de juego a casa con PlayStation 5 Slim 1 TB. Disfruta tus títulos favoritos en PlayStation 5 y convierte cada sesión en el comienzo de una nueva aventura.
+  ('PlayStation 5 Slim 1 TB', 599990, 'consolas', 'Venta', NULL, NULL, 'PlayStation 5', NULL, 'Consolas', NULL, 4, 86, 46, 'Lleva tu experiencia de juego a casa con PlayStation 5 Slim 1 TB. Disfruta tus títulos favoritos en PlayStation 5 y convierte cada sesión en el comienzo de una nueva aventura.
 
 ## Detalles
 - Producto: PlayStation 5 Slim 1 TB
@@ -1019,7 +987,7 @@ Jugadores que buscan una nueva aventura, competir o disfrutar de una buena sesi�
 
 ## Ideal para
 Quienes quieren renovar su equipo, comenzar a jugar o encontrar una gran opción para compartir en casa.'),
-  ('Nintendo Switch OLED', 349990, 'venta-consolas', 'Venta', NULL, NULL, 'Nintendo Switch', NULL, 'Consolas', NULL, 5, 23, 53, 'Lleva tu experiencia de juego a casa con Nintendo Switch OLED. Disfruta tus títulos favoritos en Nintendo Switch y convierte cada sesión en el comienzo de una nueva aventura.
+  ('Nintendo Switch OLED', 349990, 'consolas', 'Venta', NULL, NULL, 'Nintendo Switch', NULL, 'Consolas', NULL, 5, 23, 53, 'Lleva tu experiencia de juego a casa con Nintendo Switch OLED. Disfruta tus títulos favoritos en Nintendo Switch y convierte cada sesión en el comienzo de una nueva aventura.
 
 ## Detalles
 - Producto: Nintendo Switch OLED
@@ -1028,7 +996,7 @@ Quienes quieren renovar su equipo, comenzar a jugar o encontrar una gran opción
 
 ## Ideal para
 Quienes quieren renovar su equipo, comenzar a jugar o encontrar una gran opción para compartir en casa.'),
-  ('Xbox Series S 512 GB', 299990, 'venta-consolas', 'Venta', NULL, NULL, 'Xbox Series X|S', NULL, 'Consolas', NULL, 0, 60, 0, 'Lleva tu experiencia de juego a casa con Xbox Series S 512 GB. Disfruta tus títulos favoritos en Xbox Series X|S y convierte cada sesión en el comienzo de una nueva aventura.
+  ('Xbox Series S 512 GB', 299990, 'consolas', 'Venta', NULL, NULL, 'Xbox Series X|S', NULL, 'Consolas', NULL, 0, 60, 0, 'Lleva tu experiencia de juego a casa con Xbox Series S 512 GB. Disfruta tus títulos favoritos en Xbox Series X|S y convierte cada sesión en el comienzo de una nueva aventura.
 
 ## Detalles
 - Producto: Xbox Series S 512 GB
@@ -1037,7 +1005,7 @@ Quienes quieren renovar su equipo, comenzar a jugar o encontrar una gran opción
 
 ## Ideal para
 Quienes quieren renovar su equipo, comenzar a jugar o encontrar una gran opción para compartir en casa.'),
-  ('PlayStation 4 Slim 500 GB (usada)', 149990, 'consolas-usadas', 'Usadas', NULL, NULL, 'PlayStation 4', NULL, 'Consolas', NULL, 2, 97, 7, 'Haz realidad tus próximas partidas con PlayStation 4 Slim 500 GB (usada). Una alternativa más accesible para disfrutar el catálogo de PlayStation 4 y dar el siguiente paso en tu espacio gamer.
+  ('PlayStation 4 Slim 500 GB (usada)', 149990, 'consolas', 'Usadas', NULL, NULL, 'PlayStation 4', NULL, 'Consolas', NULL, 2, 97, 7, 'Haz realidad tus próximas partidas con PlayStation 4 Slim 500 GB (usada). Una alternativa más accesible para disfrutar el catálogo de PlayStation 4 y dar el siguiente paso en tu espacio gamer.
 
 ## Detalles
 - Producto: PlayStation 4 Slim 500 GB (usada)
@@ -1046,7 +1014,7 @@ Quienes quieren renovar su equipo, comenzar a jugar o encontrar una gran opción
 
 ## Ideal para
 Jugadores que buscan una consola para disfrutar en casa y sumar nuevas experiencias a su colección.'),
-  ('Nintendo Switch Lite (usada)', 129990, 'consolas-usadas', 'Usadas', NULL, NULL, 'Nintendo Switch', NULL, 'Consolas', NULL, 3, 34, 14, 'Haz realidad tus próximas partidas con Nintendo Switch Lite (usada). Una alternativa más accesible para disfrutar el catálogo de Nintendo Switch y dar el siguiente paso en tu espacio gamer.
+  ('Nintendo Switch Lite (usada)', 129990, 'consolas', 'Usadas', NULL, NULL, 'Nintendo Switch', NULL, 'Consolas', NULL, 3, 34, 14, 'Haz realidad tus próximas partidas con Nintendo Switch Lite (usada). Una alternativa más accesible para disfrutar el catálogo de Nintendo Switch y dar el siguiente paso en tu espacio gamer.
 
 ## Detalles
 - Producto: Nintendo Switch Lite (usada)
@@ -1055,7 +1023,7 @@ Jugadores que buscan una consola para disfrutar en casa y sumar nuevas experienc
 
 ## Ideal para
 Jugadores que buscan una consola para disfrutar en casa y sumar nuevas experiencias a su colección.'),
-  ('Arriendo PlayStation 5 por día', 15990, 'arriendo-consolas', 'Arriendo', NULL, NULL, 'PlayStation 5', NULL, 'Consolas', NULL, 4, 71, 21, 'Disfruta PlayStation 5 sin tener que comprar una consola. Arriendo PlayStation 5 por día está disponible en modalidad de arriendo por día para que organices una sesión de juego, una junta o un fin de semana especial.
+  ('Arriendo PlayStation 5 por día', 15990, 'consolas', 'Arriendo', NULL, NULL, 'PlayStation 5', NULL, 'Consolas', NULL, 4, 71, 21, 'Disfruta PlayStation 5 sin tener que comprar una consola. Arriendo PlayStation 5 por día está disponible en modalidad de arriendo por día para que organices una sesión de juego, una junta o un fin de semana especial.
 
 ## Detalles
 - Producto: Arriendo PlayStation 5 por día
@@ -1064,7 +1032,7 @@ Jugadores que buscan una consola para disfrutar en casa y sumar nuevas experienc
 
 ## Ideal para
 Quienes quieren jugar por un periodo acotado, probar una consola o compartir videojuegos con amigos y familia.'),
-  ('Arriendo Nintendo Switch por día', 9990, 'arriendo-consolas', 'Arriendo', NULL, NULL, 'Nintendo Switch', NULL, 'Consolas', NULL, 5, 8, 28, 'Disfruta Nintendo Switch sin tener que comprar una consola. Arriendo Nintendo Switch por día está disponible en modalidad de arriendo por día para que organices una sesión de juego, una junta o un fin de semana especial.
+  ('Arriendo Nintendo Switch por día', 9990, 'consolas', 'Arriendo', NULL, NULL, 'Nintendo Switch', NULL, 'Consolas', NULL, 5, 8, 28, 'Disfruta Nintendo Switch sin tener que comprar una consola. Arriendo Nintendo Switch por día está disponible en modalidad de arriendo por día para que organices una sesión de juego, una junta o un fin de semana especial.
 
 ## Detalles
 - Producto: Arriendo Nintendo Switch por día
@@ -1073,7 +1041,7 @@ Quienes quieren jugar por un periodo acotado, probar una consola o compartir vid
 
 ## Ideal para
 Quienes quieren jugar por un periodo acotado, probar una consola o compartir videojuegos con amigos y familia.'),
-  ('Control DualSense PS5 Blanco', 69990, 'accesorios-controles', 'Controles', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 1, 45, 35, 'Toma el control de tus partidas con Control DualSense PS5 Blanco. Un accesorio ideal para completar tu setup y disfrutar tus juegos en PlayStation 5.
+  ('Control DualSense PS5 Blanco', 69990, 'accesorios-consolas', 'Controles', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 1, 45, 35, 'Toma el control de tus partidas con Control DualSense PS5 Blanco. Un accesorio ideal para completar tu setup y disfrutar tus juegos en PlayStation 5.
 
 ## Detalles
 - Producto: Control DualSense PS5 Blanco
@@ -1082,7 +1050,7 @@ Quienes quieren jugar por un periodo acotado, probar una consola o compartir vid
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para PlayStation 5.'),
-  ('Control Pro Nintendo Switch', 64990, 'accesorios-controles', 'Controles', NULL, NULL, 'Nintendo Switch', NULL, 'Accesorios', NULL, 2, 82, 42, 'Toma el control de tus partidas con Control Pro Nintendo Switch. Un accesorio ideal para completar tu setup y disfrutar tus juegos en Nintendo Switch.
+  ('Control Pro Nintendo Switch', 64990, 'accesorios-consolas', 'Controles', NULL, NULL, 'Nintendo Switch', NULL, 'Accesorios', NULL, 2, 82, 42, 'Toma el control de tus partidas con Control Pro Nintendo Switch. Un accesorio ideal para completar tu setup y disfrutar tus juegos en Nintendo Switch.
 
 ## Detalles
 - Producto: Control Pro Nintendo Switch
@@ -1091,7 +1059,7 @@ Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Pl
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Nintendo Switch.'),
-  ('Control Xbox Series Negro', 64990, 'accesorios-controles', 'Controles', NULL, NULL, 'Xbox Series X|S', NULL, 'Accesorios', NULL, 3, 19, 49, 'Toma el control de tus partidas con Control Xbox Series Negro. Un accesorio ideal para completar tu setup y disfrutar tus juegos en Xbox Series X|S.
+  ('Control Xbox Series Negro', 64990, 'accesorios-consolas', 'Controles', NULL, NULL, 'Xbox Series X|S', NULL, 'Accesorios', NULL, 3, 19, 49, 'Toma el control de tus partidas con Control Xbox Series Negro. Un accesorio ideal para completar tu setup y disfrutar tus juegos en Xbox Series X|S.
 
 ## Detalles
 - Producto: Control Xbox Series Negro
@@ -1100,7 +1068,7 @@ Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Ni
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Xbox Series X|S.'),
-  ('Audífonos Pulse 3D PS5', 99990, 'accesorios-audifonos', 'Audífonos', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 4, 56, 56, 'Sumérgete en cada partida con Audífonos Pulse 3D PS5. Completa tu espacio gamer y disfruta tus sesiones de juego con un accesorio pensado para acompañarte en PlayStation 5.
+  ('Audífonos Pulse 3D PS5', 99990, 'accesorios-consolas', 'Audífonos', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 4, 56, 56, 'Sumérgete en cada partida con Audífonos Pulse 3D PS5. Completa tu espacio gamer y disfruta tus sesiones de juego con un accesorio pensado para acompañarte en PlayStation 5.
 
 ## Detalles
 - Producto: Audífonos Pulse 3D PS5
@@ -1109,7 +1077,7 @@ Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Xb
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para PlayStation 5.'),
-  ('Audífonos Gamer Multiplataforma', 29990, 'accesorios-audifonos', 'Audífonos', NULL, NULL, 'Multiplataforma', NULL, 'Accesorios', NULL, 0, 93, 3, 'Sumérgete en cada partida con Audífonos Gamer Multiplataforma. Completa tu espacio gamer y disfruta tus sesiones de juego con un accesorio pensado para acompañarte en Multiplataforma.
+  ('Audífonos Gamer Multiplataforma', 29990, 'accesorios-consolas', 'Audífonos', NULL, NULL, 'Multiplataforma', NULL, 'Accesorios', NULL, 0, 93, 3, 'Sumérgete en cada partida con Audífonos Gamer Multiplataforma. Completa tu espacio gamer y disfruta tus sesiones de juego con un accesorio pensado para acompañarte en Multiplataforma.
 
 ## Detalles
 - Producto: Audífonos Gamer Multiplataforma
@@ -1118,7 +1086,7 @@ Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Pl
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Multiplataforma.'),
-  ('Funda de silicona para control PS5', 7990, 'accesorios-fundas', 'Fundas y protección', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 1, 30, 10, 'Protege y transporta tu equipo con Funda de silicona para control PS5. Una forma práctica de cuidar tus accesorios y mantener tu setup listo para la próxima partida.
+  ('Funda de silicona para control PS5', 7990, 'accesorios-consolas', 'Fundas y protección', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 1, 30, 10, 'Protege y transporta tu equipo con Funda de silicona para control PS5. Una forma práctica de cuidar tus accesorios y mantener tu setup listo para la próxima partida.
 
 ## Detalles
 - Producto: Funda de silicona para control PS5
@@ -1127,7 +1095,7 @@ Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Mu
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para PlayStation 5.'),
-  ('Estuche rígido Nintendo Switch', 12990, 'accesorios-fundas', 'Fundas y protección', NULL, NULL, 'Nintendo Switch', NULL, 'Accesorios', NULL, 2, 67, 17, 'Protege y transporta tu equipo con Estuche rígido Nintendo Switch. Una forma práctica de cuidar tus accesorios y mantener tu setup listo para la próxima partida.
+  ('Estuche rígido Nintendo Switch', 12990, 'accesorios-consolas', 'Fundas y protección', NULL, NULL, 'Nintendo Switch', NULL, 'Accesorios', NULL, 2, 67, 17, 'Protege y transporta tu equipo con Estuche rígido Nintendo Switch. Una forma práctica de cuidar tus accesorios y mantener tu setup listo para la próxima partida.
 
 ## Detalles
 - Producto: Estuche rígido Nintendo Switch
@@ -1136,7 +1104,7 @@ Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Pl
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Nintendo Switch.'),
-  ('Cargador doble para controles PS5', 19990, 'accesorios-cargadores', 'Cargadores y cables', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 3, 4, 24, 'Mantén tu setup preparado con Cargador doble para controles PS5. Un accesorio práctico para acompañar tus sesiones de juego y tener tu equipo listo cuando comienza la partida.
+  ('Cargador doble para controles PS5', 19990, 'accesorios-consolas', 'Cargadores y cables', NULL, NULL, 'PlayStation 5', NULL, 'Accesorios', NULL, 3, 4, 24, 'Mantén tu setup preparado con Cargador doble para controles PS5. Un accesorio práctico para acompañar tus sesiones de juego y tener tu equipo listo cuando comienza la partida.
 
 ## Detalles
 - Producto: Cargador doble para controles PS5
@@ -1145,7 +1113,7 @@ Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para Ni
 
 ## Ideal para
 Gamers que quieren completar, cuidar o mejorar su setup con un accesorio para PlayStation 5.'),
-  ('Cable USB-C carga rápida 2 m', 5990, 'accesorios-cargadores', 'Cargadores y cables', NULL, NULL, 'Multiplataforma', NULL, 'Accesorios', NULL, 4, 41, 31, 'Mantén tu setup preparado con Cable USB-C carga rápida 2 m. Un accesorio práctico para acompañar tus sesiones de juego y tener tu equipo listo cuando comienza la partida.
+  ('Cable USB-C carga rápida 2 m', 5990, 'accesorios-consolas', 'Cargadores y cables', NULL, NULL, 'Multiplataforma', NULL, 'Accesorios', NULL, 4, 41, 31, 'Mantén tu setup preparado con Cable USB-C carga rápida 2 m. Un accesorio práctico para acompañar tus sesiones de juego y tener tu equipo listo cuando comienza la partida.
 
 ## Detalles
 - Producto: Cable USB-C carga rápida 2 m
@@ -1165,7 +1133,7 @@ INSERT INTO producto (nombre, descripcion, precio, categoria_id, tipo, idioma, m
                       codigo_barras, limite_por_cliente, stock, popularidad, fecha_ingreso, publicado,
                       creado_en, actualizado_en)
 SELECT d.nombre, d.descripcion, d.precio, c.id, d.tipo, d.idioma, d.marca, d.plataforma, f.id, d.linea,
-       CASE WHEN d.categoria = 'arriendo-consolas' OR d.tipo = 'singles' THEN NULL
+       CASE WHEN d.tipo IN ('Arriendo', 'singles') THEN NULL
             ELSE pg_temp.ean13('200' || lpad(d.n::text, 9, '0')) END,
        d.limite, d.stock, d.popularidad,
        pg_temp.hoy() - round(d.dias * 1.5)::int,

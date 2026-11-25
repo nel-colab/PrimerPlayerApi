@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import cl.primerplayer.catalogo.api.RevisionesProductoUseCase;
 import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.EstadoRevision;
+import cl.primerplayer.catalogo.api.RevisionesProductoUseCase.CambiosAprobacion;
+import cl.primerplayer.catalogo.web.dto.RevisionDtos.AprobacionRequest;
 import cl.primerplayer.catalogo.web.dto.RevisionDtos.RechazoRequest;
 import cl.primerplayer.catalogo.web.dto.RevisionDtos.RevisionResponse;
 import cl.primerplayer.shared.api.Pagina;
@@ -63,12 +65,18 @@ class AdminRevisionesProductoController {
 
     @PostMapping("/revisiones/{revisionId:\\d+}/aprobacion")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Aprobar (solo ADMIN)",
-            description = "ALTA: aprueba y publica el producto. EDICION: aplica los datos propuestos. "
-                    + "Errores: review-not-pending (409), review-outdated (409) si el producto cambió después de "
-                    + "proponer la edición.")
-    RevisionResponse aprobar(@PathVariable long revisionId, @AuthenticationPrincipal UsuarioActual usuario) {
-        return mapper.toRevision(revisiones.aprobar(revisionId, usuario.id()));
+    @Operation(summary = "Aprobar (solo ADMIN), tal cual o con cambios",
+            description = "Sin cuerpo: ALTA aprueba y publica el producto; EDICION aplica los datos propuestos "
+                    + "(review-outdated 409 si el producto cambió después de proponerla). "
+                    + "Con cuerpo {datos, version} (\"aprobar con cambios\"): el producto queda exactamente con datos "
+                    + "(incluido publicado), con las reglas de ADMIN; version es la de actual.version que vio el ADMIN "
+                    + "(version-conflict 409 si cambió). Una edición desactualizada sí se puede aprobar con cambios. "
+                    + "Otros errores: review-not-pending (409), validation (400), barcode-taken (409).")
+    RevisionResponse aprobar(@PathVariable long revisionId,
+                             @Valid @RequestBody(required = false) AprobacionRequest req,
+                             @AuthenticationPrincipal UsuarioActual usuario) {
+        CambiosAprobacion cambios = req == null ? null : new CambiosAprobacion(mapper.toDatos(req.datos()), req.version());
+        return mapper.toRevision(revisiones.aprobar(revisionId, cambios, usuario.id()));
     }
 
     @PostMapping("/revisiones/{revisionId:\\d+}/rechazo")

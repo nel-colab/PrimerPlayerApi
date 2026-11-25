@@ -35,6 +35,8 @@ Error `application/problem+json` (RFC 9457), siempre con `code`:
 | `slot-taken`, `request-not-pending` | 409 |
 | `product-not-approved`, `review-not-pending`, `review-outdated` | 409 |
 | `google-email-mismatch`, `google-account-in-use` | 409 |
+| `invalid-code` | 400 |
+| `too-many-attempts` | 429 |
 | `google-unavailable` | 503 |
 | `precondition-required` (falta `If-Match`) | 428 |
 | `limit-admin-only`, `forbidden`, `email-not-verified`, `profile-incomplete` | 403 |
@@ -49,15 +51,15 @@ Error `application/problem+json` (RFC 9457), siempre con `code`:
 | Método | Ruta | Rol | Notas |
 | --- | --- | --- | --- |
 | POST | `/auth/registro` | público | `{nombre, email, password}` → 201; envía verificación |
-| POST | `/auth/verificacion` | público | `{token}` → 204 |
+| POST | `/auth/verificacion` | público | `{email, codigo}` (6 dígitos del correo) → 204; 400 `invalid-code`, 429 `too-many-attempts` |
 | POST | `/auth/login` | público | `{email, password}` → `{accessToken, expiresIn, user}` + cookie `pp_rt` |
 | GET | `/auth/google/config` | público | `{clientId, enabled}` para el botón de Google Identity Services |
 | POST | `/auth/google` | público | `{credential}` (ID token de Google) → igual que el login. Vincula por correo o crea CLIENTE sin contraseña |
 | POST | `/me/verificacion/google` | sesión | `{credential}` → perfil con `emailVerified: true`; 409 si Google confirma otro correo |
 | POST | `/auth/refresh` | cookie `pp_rt` | rota el refresh; reuso → revoca familia; exige `X-Requested-With: pp-web` |
 | POST | `/auth/logout` | cookie | 204, revoca familia y borra cookie |
-| POST | `/auth/recuperacion` | público | `{email}` → 202 siempre |
-| POST | `/auth/restablecimiento` | público | `{token, password}` → 204 |
+| POST | `/auth/recuperacion` | público | `{email}` → 202 siempre; envía un código de 6 dígitos (vence en 1 h) |
+| POST | `/auth/restablecimiento` | público | `{email, codigo, password}` → 204; 400 `invalid-code`, 429 `too-many-attempts` |
 | GET | `/me` | sesión | `{email, name, role}` con role en minúscula del frontend (`usuario`, `vendedor`, `admin`) |
 | PUT | `/me/password` | sesión | `{actual, nueva}` → 204, revoca otros refresh |
 | GET/POST/PATCH | `/admin/usuarios[/{id}]` | ADMIN | crear, desactivar, cambiar rol de internos |
@@ -84,7 +86,7 @@ Recurso de otro cliente → **404** (no revela existencia).
 | --- | --- | --- |
 | GET | `/categorias` | árbol `{slug, titulo, hijos[]}` |
 | GET | `/franquicias` | `string[]` |
-| GET | `/productos` | `categoria` (hoja o agrupadora), `q`, `enStock`, `precioMin`, `precioMax`, `tipo[]`, `idioma[]`, `marca[]`, `plataforma[]`, `franquicia[]`, `linea[]`, `sort` = `recomendados` \| `recientes` \| `precio-asc` \| `precio-desc`, `page`, `size` → página + `facets` |
+| GET | `/productos` | `categoria` (`tcg`, `figuras`, `venta-videojuegos`, `consolas`, `accesorios-consolas` o `todos`), `q`, `enStock`, `precioMin`, `precioMax`, `tipo[]`, `idioma[]`, `marca[]`, `plataforma[]`, `franquicia[]`, `linea[]`, `sort` = `recomendados` \| `recientes` \| `precio-asc` \| `precio-desc`, `page`, `size` → página + `facets` |
 | GET | `/productos/destacados?limit=8` | por popularidad |
 | GET | `/productos/{id}`, `/productos/{id}/relacionados` | solo publicados |
 | GET | `/eventos`, `/eventos/{id}` | `tipo`, `desde`, `hasta`; incluye `cuposDisponibles`; cumpleaños con `tiendaCerrada: true` |
@@ -108,15 +110,16 @@ calculadas sobre el resultado filtrado sin la propia faceta.
 | --- | --- | --- | --- |
 | GET | `/admin/productos` | VENDEDOR | `q` (nombre, id o código), `categoria[]`, `estado[]` (publicado, oculto, stock-bajo, agotado), `sort`, `page` |
 | GET | `/admin/productos/exportar` | ADMIN | Array JSON con todos los productos activos o XLSX vía `Accept` / `format=excel` |
-| POST | `/admin/productos/importar` | ADMIN | `{filas:[...]}` JSON o multipart `archivo` XLSX/CSV; procesa filas individualmente, categoría (slug hoja) obligatoria para crear, reemplaza stock registrando ajuste |
+| POST | `/admin/productos/importar` | ADMIN | `{filas:[...]}` JSON o multipart `archivo` XLSX/CSV; procesa filas individualmente, categoría (slug de una categoría general) obligatoria para crear, reemplaza stock registrando ajuste |
 | GET | `/admin/productos/indicadores` | VENDEDOR | `{total, stockBajo, agotados}` |
 | POST | `/admin/productos` | VENDEDOR | `imagenes[{archivoId \| url, portada}]`; de VENDEDOR nace `aprobacion=PENDIENTE` sin publicar |
+| POST | `/admin/productos/codigo-barras` | VENDEDOR | → `{codigoBarras}`: EAN-13 interno `200…` libre, para productos sin código de fábrica (no se reserva) |
 | PUT | `/admin/productos/{id}` | VENDEDOR | `If-Match: <version>`; código de barras y límite ya configurado: solo ADMIN los agrega/cambia. VENDEDOR sobre producto `APROBADO` → **202** (queda en revisión, `cambioPendiente`) |
 | PATCH | `/admin/productos/{id}/publicacion` | VENDEDOR | `{publicado}`; ocultar directo; publicar de VENDEDOR → 202 o 409 `product-not-approved` |
 | DELETE | `/admin/productos/{id}` | VENDEDOR | borrado lógico; descarta su revisión pendiente |
 | GET | `/admin/productos/revisiones` | VENDEDOR | bandeja: `estado` = PENDIENTE (defecto) \| APROBADA \| RECHAZADA \| DESCARTADA \| todas; más antiguas primero |
 | GET | `/admin/productos/{id}/revisiones` | VENDEDOR | historial del producto, más reciente primero |
-| POST | `/admin/productos/revisiones/{id}/aprobacion` | ADMIN | ALTA: aprueba y publica; EDICION: aplica lo propuesto. 409 `review-not-pending`, `review-outdated` |
+| POST | `/admin/productos/revisiones/{id}/aprobacion` | ADMIN | Sin cuerpo: ALTA aprueba y publica, EDICION aplica lo propuesto (409 `review-outdated`). Con `{datos, version}`: aprobar con cambios, el producto queda como `datos` (409 `version-conflict`). Siempre 409 `review-not-pending` |
 | POST | `/admin/productos/revisiones/{id}/rechazo` | ADMIN | `{motivo}` obligatorio. 409 `review-not-pending` |
 | POST | `/admin/inventario/{productoId}/ajustes` | VENDEDOR | `{delta, motivo}` → `{stock}` |
 | GET | `/admin/inventario/{productoId}/movimientos` | VENDEDOR | kardex paginado |

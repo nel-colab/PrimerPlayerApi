@@ -60,7 +60,7 @@ class ImportarProductosIntegracionTest {
     void importarJson_creaProductoYRegistraAjusteConMotivo() throws Exception {
         String nombre = "Producto importado " + UUID.randomUUID();
         String body = """
-                {"filas":[{"nombre":"%s","precio":4990,"stock":7,"categoria":"tcg-pokemon","publicado":true}]}
+                {"filas":[{"nombre":"%s","precio":4990,"stock":7,"categoria":"tcg","publicado":true}]}
                 """.formatted(nombre);
 
         mvc.perform(post(ENDPOINT).header(HttpHeaders.AUTHORIZATION, admin.bearer())
@@ -83,7 +83,7 @@ class ImportarProductosIntegracionTest {
     @Test
     void importarJson_soloAdmin() throws Exception {
         String body = """
-                {"filas":[{"nombre":"No importar","precio":1000,"stock":1,"categoria":"tcg-pokemon"}]}
+                {"filas":[{"nombre":"No importar","precio":1000,"stock":1,"categoria":"tcg"}]}
                 """;
         mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
@@ -100,8 +100,8 @@ class ImportarProductosIntegracionTest {
         String nombre = "CSV importado " + UUID.randomUUID();
         String csv = """
                 Nombre,Precio,Stock,Categoria,Publicado
-                %s,2490,4,tcg-pokemon,Sí
-                ,1000,1,tcg-pokemon,No
+                %s,2490,4,tcg,Sí
+                ,1000,1,tcg,No
                 """.formatted(nombre);
         var archivo = new MockMultipartFile("archivo", "stock.csv", "text/csv",
                 csv.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -119,7 +119,7 @@ class ImportarProductosIntegracionTest {
     void importarJson_actualizaPorNombreConservandoOpcionalesVaciosYContinuaConErrores() throws Exception {
         String nombre = "Producto existente " + UUID.randomUUID();
         String crear = """
-                {"filas":[{"nombre":"%s","precio":1000,"stock":2,"categoria":"tcg-pokemon","marca":"Marca A","publicado":true}]}
+                {"filas":[{"nombre":"%s","precio":1000,"stock":2,"categoria":"tcg","marca":"Marca A","publicado":true}]}
                 """.formatted(nombre);
         mvc.perform(post(ENDPOINT).header(HttpHeaders.AUTHORIZATION, admin.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(crear))
@@ -128,8 +128,8 @@ class ImportarProductosIntegracionTest {
         String body = """
                 {"filas":[
                   {"nombre":"%s","precio":1500,"stock":10,"publicado":true},
-                  {"nombre":"","precio":1000,"stock":0,"categoria":"tcg-pokemon"},
-                  {"nombre":"Producto negativo","precio":-1,"stock":0,"categoria":"tcg-pokemon"}
+                  {"nombre":"","precio":1000,"stock":0,"categoria":"tcg"},
+                  {"nombre":"Producto negativo","precio":-1,"stock":0,"categoria":"tcg"}
                 ]}
                 """.formatted(nombre);
         mvc.perform(post(ENDPOINT).header(HttpHeaders.AUTHORIZATION, admin.bearer())
@@ -149,7 +149,7 @@ class ImportarProductosIntegracionTest {
     void reemplazarStockConcurrente_serializaCambiosYRegistraKardexConsistente() throws Exception {
         long producto = jdbc.queryForObject("""
                 INSERT INTO producto (nombre, precio, categoria_id, stock)
-                VALUES (?, 1000, (SELECT id FROM categoria WHERE slug = 'tcg-pokemon'), 5)
+                VALUES (?, 1000, (SELECT id FROM categoria WHERE slug = 'tcg'), 5)
                 RETURNING id
                 """, Long.class, "Stock concurrente " + UUID.randomUUID());
         var inicio = new CountDownLatch(1);

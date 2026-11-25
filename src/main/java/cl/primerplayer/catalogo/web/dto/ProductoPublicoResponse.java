@@ -11,7 +11,7 @@ public record ProductoPublicoResponse(
         String nombre,
         String descripcion,
         @Schema(description = "CLP", example = "6990") long precio,
-        @Schema(example = "tcg-pokemon") String categoria,
+        @Schema(example = "tcg") String categoria,
         String tipo,
         String idioma,
         String marca,

@@ -25,21 +25,28 @@ public interface CuentaUseCase {
      */
     void cambiarPassword(long usuarioId, String actual, String nueva);
 
-    /** @throws TokenInvalidoException 400 {@code invalid-token} si no existe, venció o ya se usó */
-    void verificarEmail(String token);
+    /**
+     * Verifica el correo con el código de 6 dígitos que llegó por correo.
+     *
+     * @throws CodigoInvalidoException      400 {@code invalid-code} si no corresponde, venció, ya se usó o agotó sus
+     *                                      intentos (el mismo error si el correo no está registrado)
+     * @throws DemasiadosIntentosException  429 {@code too-many-attempts} tras 10 códigos errados en una hora
+     */
+    void verificarEmail(String email, String codigo);
 
     /** @throws YaVerificadoException 409 {@code already-verified} */
     void reenviarVerificacion(long usuarioId);
 
-    /** Siempre "acepta" (202): no revela si el correo existe. Si existe, envía el enlace de restablecimiento. */
+    /** Siempre "acepta" (202): no revela si el correo existe. Si existe, envía el código de restablecimiento. */
     void solicitarRecuperacion(String email);
 
     /**
-     * Define una contraseña nueva con el enlace de recuperación; cierra todas las sesiones y desbloquea la cuenta.
+     * Define una contraseña nueva con el código de recuperación; cierra todas las sesiones y desbloquea la cuenta.
      *
-     * @throws TokenInvalidoException 400 {@code invalid-token}
+     * @throws CodigoInvalidoException     400 {@code invalid-code}
+     * @throws DemasiadosIntentosException 429 {@code too-many-attempts}
      */
-    void restablecerPassword(String token, String nueva);
+    void restablecerPassword(String email, String codigo, String nueva);
 
     record Perfil(long id, String email, String nombre, Rol rol, String telefono, String rut, Instant miembroDesde,
                   boolean emailVerificado, boolean cambioPasswordPendiente) {

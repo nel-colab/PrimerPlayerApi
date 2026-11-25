@@ -29,6 +29,9 @@ public interface RevisionRepositorio {
 
     void resolver(long id, EstadoRevision estado, String motivoRechazo, Long revisadoPor, Instant ahora);
 
+    /** Aprobada con cambios: guarda lo que el ADMIN aprobó (la revisión ya debe estar APROBADA). */
+    void guardarAprobados(long id, DatosProducto aprobados);
+
     /** @param estado {@code null} = todas */
     Pagina<Revision> buscar(EstadoRevision estado, int page, int size);
 
@@ -40,6 +43,7 @@ public interface RevisionRepositorio {
             TipoRevision tipo,
             EstadoRevision estado,
             DatosProducto propuesto,
+            DatosProducto aprobado,
             int versionBase,
             String motivoRechazo,
             long solicitadoPor,

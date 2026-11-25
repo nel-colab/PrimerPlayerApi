@@ -122,6 +122,17 @@ class AdminProductosController {
         return conEtag(ResponseEntity.created(URI.create("/api/v1/admin/productos/" + creado.id())), creado);
     }
 
+    @PostMapping("/codigo-barras")
+    @Operation(summary = "Generar un código de barras interno",
+            description = "Para productos sin código de fábrica: devuelve un EAN-13 '200…' con dígito verificador que no "
+                    + "está en uso. No se reserva: queda asignado al guardar el producto con él (POST o PUT). Dos "
+                    + "llamadas nunca devuelven el mismo. Agregarlo a un producto ya creado sigue siendo solo de ADMIN.")
+    CodigoBarrasGenerado generarCodigoBarras() {
+        return new CodigoBarrasGenerado(administrar.generarCodigoBarras());
+    }
+
+    record CodigoBarrasGenerado(String codigoBarras) {}
+
     @PutMapping("/{id:\\d+}")
     @Operation(summary = "Reemplazar producto", description = "Exige If-Match con la versión leída. "
             + "Solo ADMIN agrega o cambia el código de barras y el límite ya configurado. "

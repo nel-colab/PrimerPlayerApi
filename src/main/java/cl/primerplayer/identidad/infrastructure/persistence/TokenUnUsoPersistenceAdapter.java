@@ -26,6 +26,7 @@ class TokenUnUsoPersistenceAdapter implements TokenUnUsoRepositorio {
         e.setUsuarioId(t.usuarioId());
         e.setTipo(t.tipo());
         e.setTokenHash(t.tokenHash());
+        e.setCreadoEn(t.creadoEn());
         e.setExpiraEn(t.expiraEn());
         jpa.save(e);
     }

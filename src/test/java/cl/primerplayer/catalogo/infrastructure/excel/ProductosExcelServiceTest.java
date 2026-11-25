@@ -37,7 +37,7 @@ class ProductosExcelServiceTest {
     }
 
     private static ProductoAdmin producto(String nombre, long precio, int stock, boolean publicado) {
-        return new ProductoAdmin(1, nombre, null, precio, "tcg-pokemon", null, null, null, null, null, null,
+        return new ProductoAdmin(1, nombre, null, precio, "tcg", null, null, null, null, null, null,
                 null, null, stock, 0, LocalDate.of(2026, 1, 1), publicado, List.of(),
                 cl.primerplayer.catalogo.api.EstadoAprobacion.APROBADO, false, 0, Instant.EPOCH);
     }
