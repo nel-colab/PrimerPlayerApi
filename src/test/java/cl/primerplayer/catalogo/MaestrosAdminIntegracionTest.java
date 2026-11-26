@@ -86,6 +86,18 @@ class MaestrosAdminIntegracionTest {
                 RETURNING id""", Long.class, unico(), categoriaId, franquiciaId);
     }
 
+    /**
+     * Revisión con datos de producto COMPLETOS (como los guarda la API): la base es compartida entre pruebas y la
+     * bandeja de revisiones de otras pruebas debe poder leerla.
+     */
+    static String propuesta(String categoria, String franquicia) {
+        return """
+                {"nombre":"Propuesta %s","descripcion":null,"precio":1000,"categoria":"%s","tipo":null,"idioma":null,
+                 "marca":null,"plataforma":null,"franquicia":%s,"linea":null,"codigoBarras":null,
+                 "limitePorCliente":null,"publicado":false,"imagenes":[]}"""
+                .formatted(unico(), categoria, franquicia == null ? "null" : "\"" + franquicia + "\"");
+    }
+
     void revision(String json, String estado) {
         long productoId = producto(null, null);
         jdbc.update("""
@@ -205,7 +217,7 @@ class MaestrosAdminIntegracionTest {
     void categoriaMencionadaSoloEnUnaRevisionNoSeElimina() throws Exception {
         String u = unico();
         int id = crearCategoria("Propuesta " + u);
-        revision("{\"categoria\":\"propuesta-" + u + "\"}", "RECHAZADA");
+        revision(propuesta("propuesta-" + u, null), "RECHAZADA");
 
         como(admin, delete(CATEGORIAS + "/" + id))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("category-in-use"));
@@ -271,7 +283,7 @@ class MaestrosAdminIntegracionTest {
     void renombrarActualizaRevisionesPendientesYLasMantieneEnUso() throws Exception {
         String u = unico();
         int id = crearFranquicia("Chainsaw " + u);
-        revision("{\"categoria\":\"figuras\",\"franquicia\":\"chainsaw " + u + "\"}", "PENDIENTE");
+        revision(propuesta("figuras", "chainsaw " + u), "PENDIENTE");
 
         como(admin, put(FRANQUICIAS + "/" + id).content("{\"nombre\":\"Chainsaw Man " + u + "\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.enUso").value(true));
