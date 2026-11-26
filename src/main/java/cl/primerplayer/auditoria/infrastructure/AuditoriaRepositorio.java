@@ -21,6 +21,8 @@ public class AuditoriaRepositorio {
 
     public record Filtro(String entidad, String entidadId, Instant desde, Instant hasta) {}
 
+    // S2077: el SQL solo concatena constantes y fragmentos fijos; los valores van siempre como parámetros "?".
+    @SuppressWarnings("java:S2077")
     public List<Registro> buscar(Filtro f, int page, int size) {
         List<Object> args = new ArrayList<>();
         String where = where(f, args);
@@ -35,6 +37,8 @@ public class AuditoriaRepositorio {
                 args.toArray());
     }
 
+    // S2077: el SQL solo concatena constantes y fragmentos fijos; los valores van siempre como parámetros "?".
+    @SuppressWarnings("java:S2077")
     public long contar(Filtro f) {
         List<Object> args = new ArrayList<>();
         Long n = jdbc.queryForObject("SELECT count(*) FROM auditoria" + where(f, args), Long.class, args.toArray());

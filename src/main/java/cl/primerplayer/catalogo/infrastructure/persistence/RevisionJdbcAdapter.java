@@ -93,6 +93,8 @@ class RevisionJdbcAdapter implements RevisionRepositorio {
                 aJson(aprobados), id);
     }
 
+    // S2077: el SQL solo concatena constantes y fragmentos fijos; los valores van siempre como parámetros "?".
+    @SuppressWarnings("java:S2077")
     @Override
     public Pagina<Revision> buscar(EstadoRevision estado, int page, int size) {
         String where = estado == null ? "" : " WHERE estado = ?";
