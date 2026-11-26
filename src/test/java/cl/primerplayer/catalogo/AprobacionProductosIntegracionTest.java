@@ -435,7 +435,8 @@ class AprobacionProductosIntegracionTest {
         }
         como(admin, get(REVISIONES).param("estado", "otro"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("estado"));
-        como(admin, get(REVISIONES).param("estado", "todas"))
+        // size=100: la base es compartida entre pruebas y la bandeja va de la más antigua a la más nueva.
+        como(admin, get(REVISIONES).param("estado", "todas").param("size", "100"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[*].id", hasItem((int) rev)));
     }
 }
