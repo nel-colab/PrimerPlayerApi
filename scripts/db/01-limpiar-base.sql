@@ -1,5 +1,5 @@
 -- =====================================================================================================
--- Primer Player · 01 · Vaciar la base de datos (SOLO DESARROLLO LOCAL)
+-- Primer Player · 01 · Vaciar la base de datos (SOLO DESARROLLO LOCAL Y STAGING)
 --
 -- Deja TODAS las tablas vacías y reinicia los contadores (IDs y códigos de pedido).
 -- Única fila que se conserva: el usuario administrador `admin@primerplayer.cl` (con su contraseña actual).
@@ -22,12 +22,14 @@ DECLARE
   v_tablas text;
   v_max_id bigint;
 BEGIN
-  IF current_database() <> 'primerplayer' THEN
-    RAISE EXCEPTION 'Este script solo se ejecuta sobre la base local "primerplayer" (estás en "%").', current_database();
+  IF current_database() NOT IN ('primerplayer', 'runagard_staging') THEN
+    RAISE EXCEPTION 'Este script solo se ejecuta en local ("primerplayer") o staging ("runagard_staging"); estás en "%".',
+      current_database();
   END IF;
 
   -- Sin administrador nadie podría volver a entrar al panel: mejor no borrar nada.
-  IF NOT EXISTS (SELECT 1 FROM usuario WHERE email = v_admin_email) THEN
+  -- En staging se permite: poblar-staging.sh corre 02-poblar-base.sql justo después, y ese crea el administrador.
+  IF current_database() = 'primerplayer' AND NOT EXISTS (SELECT 1 FROM usuario WHERE email = v_admin_email) THEN
     RAISE EXCEPTION 'No existe % en la base; no se limpia nada para no dejarte sin acceso.', v_admin_email;
   END IF;
 
@@ -51,7 +53,7 @@ BEGIN
 
   -- El próximo usuario nuevo toma el ID siguiente al del administrador.
   SELECT max(id) INTO v_max_id FROM usuario;
-  EXECUTE format('ALTER TABLE usuario ALTER COLUMN id RESTART WITH %s', v_max_id + 1);
+  EXECUTE format('ALTER TABLE usuario ALTER COLUMN id RESTART WITH %s', coalesce(v_max_id, 0) + 1);
 
   RAISE NOTICE 'Usuarios: solo queda % (id %).', v_admin_email, v_max_id;
 END $$;

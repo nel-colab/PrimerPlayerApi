@@ -1,5 +1,7 @@
 -- =====================================================================================================
--- Primer Player · 02 · Poblar la base con datos de demostración (SOLO DESARROLLO LOCAL)
+-- Primer Player · 02 · Poblar la base con datos de demostración (SOLO DESARROLLO LOCAL Y STAGING)
+--
+-- Bases permitidas: "primerplayer" (local) y "runagard_staging" (staging). Producción ("runagard") nunca.
 --
 -- Llena TODAS las tablas de negocio con datos realistas y coherentes entre sí, para recorrer la aplicación
 -- completa: catálogo, stock, eventos, cumpleaños, pedidos web y de mostrador, Webpay, caja, auditoría y correos.
@@ -14,11 +16,25 @@
 --   admin@primerplayer.cl (ADMIN) · vendedor@primerplayer.cl (VENDEDOR) · cliente@primerplayer.cl (CLIENTE)
 --   vendedora@demo.primerplayer.cl (VENDEDOR) · clientes demo *@demo.primerplayer.cl
 --
+-- Parámetros opcionales (psql -v):
+--   escala=N   (1 a 50, por defecto 1) multiplica el volumen para pruebas de carga: N veces las ventas diarias del
+--              historial, (N−1) copias del catálogo como productos adicionales y (N−1)×10 clientes extra
+--              (carga-NNNN@demo.primerplayer.cl). Con escala=1 los datos son exactamente los de siempre.
+--   clave=...  contraseña para TODAS las cuentas (en vez de PrimerPlayer2026!). Obligatoria en staging: es público.
+--
 -- Uso (Git Bash, desde la raíz del proyecto):
 --   docker compose exec -T postgres psql -U pp -d primerplayer -v ON_ERROR_STOP=1 < scripts/db/02-poblar-base.sql
+--   Staging: ./scripts/db/poblar-staging.sh   (corre 01 + 02 en el VPS por SSH)
 -- =====================================================================================================
 
+\if :{?escala}
+\else
+  \set escala 1
+\endif
+
 BEGIN;
+
+SELECT set_config('demo.escala', :'escala', false);
 
 -- -----------------------------------------------------------------------------------------------------
 -- 0. Precondición: base vacía
@@ -26,8 +42,12 @@ BEGIN;
 -- -----------------------------------------------------------------------------------------------------
 DO $$
 BEGIN
-  IF current_database() <> 'primerplayer' THEN
-    RAISE EXCEPTION 'Este script solo se ejecuta sobre la base local "primerplayer" (estás en "%").', current_database();
+  IF current_database() NOT IN ('primerplayer', 'runagard_staging') THEN
+    RAISE EXCEPTION 'Este script solo se ejecuta en local ("primerplayer") o staging ("runagard_staging"); estás en "%".',
+      current_database();
+  END IF;
+  IF current_setting('demo.escala') !~ '^[0-9]+$' OR current_setting('demo.escala')::int NOT BETWEEN 1 AND 50 THEN
+    RAISE EXCEPTION 'escala debe ser un entero entre 1 y 50 (llegó "%").', current_setting('demo.escala');
   END IF;
   IF EXISTS (SELECT 1 FROM producto) OR EXISTS (SELECT 1 FROM evento) OR EXISTS (SELECT 1 FROM pedido)
      OR EXISTS (SELECT 1 FROM usuario WHERE email NOT IN ('mostrador@primerplayer.cl', 'admin@primerplayer.cl',
@@ -167,6 +187,19 @@ FROM (VALUES
   ('lucas.torres@demo.primerplayer.cl',       'Lucas Torres',       'CLIENTE',  TRUE,  TRUE,  NULL,                NULL,     FALSE, TRUE,  220)   -- eliminado
 ) AS v(email, nombre, rol, activo, verificado, telefono, rut, bloqueado, eliminado, dias)
 ON CONFLICT (email) DO NOTHING;   -- si la app ya creó las 3 cuentas dev, se conservan
+
+-- Clientes extra para pruebas de carga (solo con escala > 1): verificados, activos y con la misma contraseña.
+INSERT INTO usuario (email, nombre, password_hash, rol, activo, email_verificado_en, creado_en, actualizado_en)
+SELECT format('carga-%s@demo.primerplayer.cl', lpad(i::text, 4, '0')),
+       (ARRAY['Sofía','Mateo','Emilia','Benjamín','Josefa','Lucas','Trinidad','Gaspar','Amanda','Maximiliano'])[1 + i % 10]
+         || ' ' ||
+       (ARRAY['González','Muñoz','Rojas','Díaz','Pérez','Soto','Contreras','Silva','Martínez','Sepúlveda'])[1 + (i / 10) % 10],
+       '$2a$12$VOdHD72fQRUVG4Hr4W1SZ.L0Toz4ijrG5xNIdG3GDrtsnQaBIPWiS', 'CLIENTE', TRUE,
+       now() - make_interval(days => 1 + i % 300) + interval '10 minutes',
+       now() - make_interval(days => 1 + i % 300),
+       now() - make_interval(days => 1 + i % 300)
+FROM generate_series(1, (current_setting('demo.escala')::int - 1) * 10) AS i
+ON CONFLICT (email) DO NOTHING;
 
 -- V9: baneo, lista negra, cambio de contraseña pendiente y último acceso
 -- Joaquín ya tenía bloqueo automático (intentos fallidos); aquí además recibe un baneo manual.
@@ -1149,6 +1182,27 @@ ORDER BY d.n;
 UPDATE producto SET eliminado_en = pg_temp.ts(pg_temp.hoy() - 5, 18), actualizado_en = pg_temp.ts(pg_temp.hoy() - 5, 18)
  WHERE nombre = 'Mini Tin Charizard';
 
+-- Productos extra para pruebas de carga (solo con escala > 1): (escala − 1) copias del catálogo, publicadas, sin
+-- límite por cliente y con código de barras propio (EAN-13 interno con prefijo 201, distinto del 200 de arriba).
+INSERT INTO producto (nombre, descripcion, precio, categoria_id, tipo, idioma, marca, plataforma, franquicia_id, linea,
+                      codigo_barras, limite_por_cliente, stock, popularidad, fecha_ingreso, publicado,
+                      creado_en, actualizado_en)
+SELECT d.nombre || ' · Lote ' || (g + 1), d.descripcion,
+       d.precio + (g % 5) * 500, c.id, d.tipo, d.idioma, d.marca, d.plataforma, f.id, d.linea,
+       CASE WHEN d.tipo IN ('Arriendo', 'singles') THEN NULL
+            ELSE pg_temp.ean13('201' || lpad(g::text, 3, '0') || lpad(d.n::text, 6, '0')) END,
+       NULL,
+       floor(pg_temp.rnd('ls' || g || '-' || d.n) * 40)::int,
+       floor(pg_temp.rnd('lp' || g || '-' || d.n) * 100)::int,
+       pg_temp.hoy() - (10 + floor(pg_temp.rnd('ld' || g || '-' || d.n) * 120)::int),
+       TRUE,
+       pg_temp.ts(pg_temp.hoy() - 130, 9), pg_temp.ts(pg_temp.hoy() - 130, 9)
+FROM demo_producto d
+CROSS JOIN generate_series(1, current_setting('demo.escala')::int - 1) AS g
+JOIN categoria c ON c.slug = d.categoria
+LEFT JOIN franquicia f ON f.nombre = d.franquicia
+ORDER BY g, d.n;
+
 -- Imágenes: portada para todos; galería de 3 para cajas y consolas (URLs https externas de ejemplo).
 INSERT INTO producto_imagen (producto_id, posicion, url_externa, es_portada)
 SELECT p.id, 0, 'https://placehold.co/800x800/png?text=' || replace(coalesce(p.linea, 'Primer Player'), ' ', '+'), TRUE
@@ -1551,6 +1605,7 @@ DECLARE
   v_clientes bigint[]; v_elig bigint[]; v_prods bigint[]; v_cants int[];
   d date; v_i int; k int; l int; n int; v_edad int; v_seed text; v_h float8; v_r float8; v_pid bigint;
   v_estado text; v_tx text; v_cli bigint;
+  v_escala int := current_setting('demo.escala')::int;   -- pruebas de carga: N veces las ventas diarias
 BEGIN
   SELECT array_agg(id ORDER BY id) INTO v_clientes FROM usuario
    WHERE rol = 'CLIENTE' AND NOT es_anonimo AND activo AND eliminado_en IS NULL
@@ -1568,6 +1623,7 @@ BEGIN
     -- Mostrador: 3 a 9 ventas (domingo 1 a 3), de 11:00 a 20:00.
     n := CASE WHEN extract(dow FROM d) = 0 THEN 1 + floor(pg_temp.rnd('nt' || d) * 3)
               ELSE 3 + floor(pg_temp.rnd('nt' || d) * 7) END;
+    n := n * v_escala;
     FOR k IN 1 .. n LOOP
       v_seed := 't' || d || '-' || k;
       v_h    := 11 + pg_temp.rnd(v_seed || 'h') * 9;
@@ -1590,7 +1646,7 @@ BEGIN
 
     -- Web: 0 a 3 pedidos, de 9:00 a 23:00.
     v_r := pg_temp.rnd('nw' || d);
-    n := CASE WHEN v_r < 0.30 THEN 0 WHEN v_r < 0.70 THEN 1 WHEN v_r < 0.92 THEN 2 ELSE 3 END;
+    n := v_escala * CASE WHEN v_r < 0.30 THEN 0 WHEN v_r < 0.70 THEN 1 WHEN v_r < 0.92 THEN 2 ELSE 3 END;
     FOR k IN 1 .. n LOOP
       v_seed := 'w' || d || '-' || k;
       v_h    := 9 + pg_temp.rnd(v_seed || 'h') * 14;
@@ -2017,5 +2073,25 @@ END $$;
 
 DROP SEQUENCE demo_pedido_tmp;
 DROP SEQUENCE demo_boleta;
+
+-- Contraseña propia para todas las cuentas (-v clave=...): un solo hash bcrypt (costo 12, el mismo de la app) con
+-- pgcrypto, que se instala solo para esto y se quita al terminar si no estaba.
+\if :{?clave}
+SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto') AS instalar_pgcrypto \gset
+\if :instalar_pgcrypto
+CREATE EXTENSION pgcrypto;
+\endif
+WITH h AS (SELECT crypt(:'clave', gen_salt('bf', 12)) AS hash)
+UPDATE usuario SET password_hash = h.hash FROM h WHERE password_hash IS NOT NULL;
+\if :instalar_pgcrypto
+DROP EXTENSION pgcrypto;
+\endif
+\else
+DO $$ BEGIN
+  IF current_database() = 'runagard_staging' THEN
+    RAISE EXCEPTION 'En staging hay que pasar -v clave=... : no se dejan cuentas con la contraseña publicada en el repo.';
+  END IF;
+END $$;
+\endif
 
 COMMIT;
