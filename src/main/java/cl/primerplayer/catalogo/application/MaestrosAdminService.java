@@ -38,7 +38,6 @@ class MaestrosAdminService implements AdministrarMaestrosUseCase {
     static final int MAX_FRANQUICIA = 60;
     static final int MAX_ORDEN = 9999;
     static final String AGRUPADORA = "todos";
-    private static final String PATRON_SLUG = "[a-z0-9]+(-[a-z0-9]+)*";
 
     private final MaestrosAdminRepositorio repo;
     private final ApplicationEventPublisher eventos;
@@ -175,18 +174,50 @@ class MaestrosAdminService implements AdministrarMaestrosUseCase {
 
     // ---------- reglas ----------
 
-    /** "Juegos de Mesa & Más" → {@code juegos-de-mesa-mas}: sin acentos, minúsculas, guiones. */
+    /** "Juegos de Mesa & Más" → {@code juegos-de-mesa-mas}: sin acentos, minúsculas, guiones. Sin regex (lineal). */
     static String slugDe(String texto) {
-        String base = Normalizer.normalize(texto, Normalizer.Form.NFD).replaceAll("\\p{M}", "")
-                .toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
-        if (base.length() > MAX_SLUG) {
-            base = base.substring(0, MAX_SLUG).replaceAll("-+$", "");
+        String sinAcentos = Normalizer.normalize(texto, Normalizer.Form.NFD).toLowerCase(Locale.ROOT);
+        StringBuilder b = new StringBuilder();
+        boolean guionPendiente = false;
+        for (int i = 0; i < sinAcentos.length() && b.length() < MAX_SLUG; i++) {
+            char c = sinAcentos.charAt(i);
+            if (Character.getType(c) == Character.NON_SPACING_MARK) {
+                continue;   // tilde o diéresis separada por la normalización NFD
+            }
+            if (esAlfanumerico(c)) {
+                if (guionPendiente && !b.isEmpty() && b.length() < MAX_SLUG - 1) {
+                    b.append('-');
+                }
+                guionPendiente = false;
+                b.append(c);
+            } else {
+                guionPendiente = true;
+            }
         }
-        return base;
+        return b.toString();
+    }
+
+    /** Minúsculas, números y guiones simples entre ellos ({@code a-b-c}); sin guion al inicio ni al final. */
+    static boolean esSlugValido(String slug) {
+        if (slug.isEmpty() || slug.length() > MAX_SLUG || slug.charAt(0) == '-' || slug.charAt(slug.length() - 1) == '-') {
+            return false;
+        }
+        for (int i = 0; i < slug.length(); i++) {
+            char c = slug.charAt(i);
+            boolean guionDoble = c == '-' && slug.charAt(i - 1) == '-';
+            if (!(esAlfanumerico(c) || c == '-') || guionDoble) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean esAlfanumerico(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
     }
 
     private static void validarSlug(String slug) {
-        if (slug.isEmpty() || slug.length() > MAX_SLUG || !slug.matches(PATRON_SLUG)) {
+        if (!esSlugValido(slug)) {
             throw new ValidacionException("slug",
                     "El identificador debe tener letras minúsculas, números y guiones (máx. " + MAX_SLUG + ").");
         }

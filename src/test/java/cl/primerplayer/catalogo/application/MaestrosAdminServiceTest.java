@@ -85,6 +85,28 @@ class MaestrosAdminServiceTest {
         assertThat(s).hasSizeLessThanOrEqualTo(60).doesNotEndWith("-").startsWith("a".repeat(59));
     }
 
+    @Test
+    void slugNoTerminaEnGuionAunqueSeCorteJustoAntesDeUnaPalabra() {
+        String s = MaestrosAdminService.slugDe("a".repeat(59) + " bcd");
+        assertThat(s).hasSize(60).isEqualTo("a".repeat(59) + "b");
+        assertThat(MaestrosAdminService.slugDe("a".repeat(58) + " bcd")).isEqualTo("a".repeat(58) + "-b");
+        assertThat(MaestrosAdminService.slugDe("¡¡¡")).isEmpty();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"tcg, true", "juegos-de-mesa, true", "rol-2026, true", "-tcg, false", "tcg-, false",
+            "juegos--mesa, false", "Juegos, false", "café, false", "con_guion, false"})
+    void slugValido(String slug, boolean valido) {
+        assertThat(MaestrosAdminService.esSlugValido(slug)).isEqualTo(valido);
+    }
+
+    @Test
+    void slugVacioOLargoNoEsValido() {
+        assertThat(MaestrosAdminService.esSlugValido("")).isFalse();
+        assertThat(MaestrosAdminService.esSlugValido("a".repeat(61))).isFalse();
+        assertThat(MaestrosAdminService.esSlugValido("a".repeat(60))).isTrue();
+    }
+
     // ---------- categorías ----------
 
     @Test
