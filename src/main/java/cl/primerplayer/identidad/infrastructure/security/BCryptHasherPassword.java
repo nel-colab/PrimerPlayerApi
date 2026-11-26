@@ -1,5 +1,7 @@
 package cl.primerplayer.identidad.infrastructure.security;
 
+import java.util.UUID;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -10,7 +12,8 @@ import cl.primerplayer.identidad.application.port.out.HasherPassword;
 class BCryptHasherPassword implements HasherPassword {
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
-    private final String senuelo = encoder.encode("senuelo-para-tiempo-constante");
+    /** Hash de un valor aleatorio (no adivinable) para que el login tarde lo mismo exista o no el usuario. */
+    private final String senuelo = encoder.encode(UUID.randomUUID().toString());
 
     @Override
     public String hashear(String passwordPlano) {

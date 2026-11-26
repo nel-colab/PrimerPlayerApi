@@ -34,6 +34,8 @@ class AdminUsuariosJdbcAdapter implements AdminUsuariosRepositorio {
 
     private final JdbcTemplate jdbc;
 
+    // S2077: el SQL solo concatena constantes y fragmentos fijos; los valores van siempre como parámetros "?".
+    @SuppressWarnings("java:S2077")
     @Override
     public List<UsuarioAdmin> buscar(Filtro f, Instant ahora) {
         List<Object> args = new ArrayList<>();
@@ -45,6 +47,8 @@ class AdminUsuariosJdbcAdapter implements AdminUsuariosRepositorio {
                 + " ORDER BY u.creado_en DESC, u.id DESC LIMIT ? OFFSET ?", (rs, n) -> fila(rs), args.toArray());
     }
 
+    // S2077: el SQL solo concatena constantes y fragmentos fijos; los valores van siempre como parámetros "?".
+    @SuppressWarnings("java:S2077")
     @Override
     public long contar(Filtro f, Instant ahora) {
         List<Object> args = new ArrayList<>();
@@ -52,6 +56,8 @@ class AdminUsuariosJdbcAdapter implements AdminUsuariosRepositorio {
         return n == null ? 0 : n;
     }
 
+    // S2077: el SQL solo concatena constantes y fragmentos fijos; los valores van siempre como parámetros "?".
+    @SuppressWarnings("java:S2077")
     @Override
     public Indicadores indicadores(Instant ahora) {
         return jdbc.queryForObject("""

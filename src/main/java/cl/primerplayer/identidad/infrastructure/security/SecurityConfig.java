@@ -25,11 +25,12 @@ import jakarta.servlet.http.HttpServletResponse;
 @EnableMethodSecurity
 class SecurityConfig {
 
+    // S4502: CSRF no aplica: la API es stateless con JWT en Authorization; la única cookie (pp_rt, /auth/refresh)
+    // es SameSite=Strict y exige X-Requested-With: pp-web (AuthController).
+    @SuppressWarnings("java:S4502")
     @Bean
     SecurityFilterChain api(HttpSecurity http) throws Exception {
         http
-            // Sin sesión ni cookies de autenticación: el JWT va en Authorization. El único endpoint con cookie
-            // (/auth/refresh, pendiente) se protegerá con SameSite=Strict + X-Requested-With: pp-web.
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
