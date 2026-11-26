@@ -15,8 +15,9 @@ BEGIN;
 
 DO $$
 BEGIN
-  IF current_database() <> 'primerplayer' THEN
-    RAISE EXCEPTION 'Este script solo se ejecuta sobre la base local "primerplayer" (estás en "%").', current_database();
+  IF current_database() NOT IN ('primerplayer', 'runagard_staging') THEN
+    RAISE EXCEPTION 'Este script solo se ejecuta en local ("primerplayer") o staging ("runagard_staging"); estás en "%".',
+      current_database();
   END IF;
 END $$;
 

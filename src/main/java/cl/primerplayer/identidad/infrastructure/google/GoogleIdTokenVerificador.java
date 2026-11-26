@@ -3,7 +3,9 @@ package cl.primerplayer.identidad.infrastructure.google;
 import java.time.Clock;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -38,18 +40,31 @@ class GoogleIdTokenVerificador implements VerificadorGoogle {
     private final JwtDecoder decoder;
     private final String clientId;
 
+    @Autowired
     GoogleIdTokenVerificador(GoogleProperties props, Clock clock) {
-        this.clientId = props.clientId() == null ? "" : props.clientId().strip();
-        if (clientId.isEmpty()) {
+        this(props.clientId(), id -> {
+            NimbusJwtDecoder d = NimbusJwtDecoder.withJwkSetUri(JWKS).jwsAlgorithm(SignatureAlgorithm.RS256).build();
+            d.setJwtValidator(validador(id, clock));
+            return d;
+        });
+    }
+
+    /** @param fabrica crea el decodificador para el client id (las pruebas entregan uno sin red) */
+    GoogleIdTokenVerificador(String clientId, Function<String, JwtDecoder> fabrica) {
+        this.clientId = clientId == null ? "" : clientId.strip();
+        if (this.clientId.isEmpty()) {
             this.decoder = null;
             log.warn("Inicio de sesión con Google deshabilitado: falta pp.auth.google.client-id (PP_AUTH_GOOGLE_CLIENT_ID)");
             return;
         }
-        NimbusJwtDecoder d = NimbusJwtDecoder.withJwkSetUri(JWKS).jwsAlgorithm(SignatureAlgorithm.RS256).build();
+        this.decoder = fabrica.apply(this.clientId);
+    }
+
+    /** Vigencia (con el reloj inyectable), emisor de Google y audiencia = nuestro client id. */
+    static OAuth2TokenValidator<Jwt> validador(String clientId, Clock clock) {
         JwtTimestampValidator vigencia = new JwtTimestampValidator();
         vigencia.setClock(clock);
-        d.setJwtValidator(new DelegatingOAuth2TokenValidator<>(vigencia, emisor(), audiencia(clientId)));
-        this.decoder = d;
+        return new DelegatingOAuth2TokenValidator<>(vigencia, emisor(), audiencia(clientId));
     }
 
     @Override

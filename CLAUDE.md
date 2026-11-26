@@ -66,4 +66,5 @@ Perfil `prod` en `application-prod.yaml`; Actuator escucha en el 8081 (solo red 
 - `/primer-player-dominio` — reglas de negocio, modelo de datos y contrato de API.
 - `/nuevo-modulo-spring` — crear o completar un módulo con la estructura estándar.
 - `/migracion-flyway` — escribir una migración de base de datos.
+- `/cobertura-minima` — todo código que va a staging o producción debe tener cobertura mínima de 80 %.
 - `/iniciar-proyecto` — generar el esqueleto del proyecto (solo una vez; solo se ejecuta si la invocas).
