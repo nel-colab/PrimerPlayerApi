@@ -24,13 +24,15 @@ Alcance: `$ARGUMENTS`
 ## Control automático (no depende de nadie)
 
 1. **JaCoCo `check`** (`pom.xml`, perfil `ci`, ejecución `cobertura-minima`): `./mvnw -Pci verify` — la etapa
-   *Pruebas* de Jenkins — falla si la cobertura total baja de **80 % en líneas** o del **piso de ramas** (hoy 74 %).
+   *Pruebas* de Jenkins — falla si la cobertura total baja de **80 % en líneas** o de **80 % en ramas**.
 2. **Quality gate de SonarQube**: *Coverage on New Code* ≥ 80 % → Jenkins aborta antes de la imagen.
 
-**Piso que sube (ratchet)**: el mínimo de ramas solo se sube, nunca se baja. Cada vez que la cobertura de ramas
-medida supere el piso por ≥ 1 punto, sube `<minimum>` del contador `BRANCH` al valor medido (redondeado hacia
-abajo, ej. 0.77) en el mismo commit, hasta llegar a 0.80. Bajar cualquier `<minimum>` exige aprobación explícita
-del usuario.
+**El 80 % no se rebaja nunca** (decisión del usuario, 2026-11-26). Si un cambio deja la cobertura bajo 80 %, se
+agregan pruebas; jamás se baja `<minimum>`. Jenkins mide ~1 punto menos que una máquina local (ramas que dependen
+del entorno), así que localmente apunta a **≥ 81,5 % de ramas** antes de subir.
+
+Si `verify` falla de forma rara (Flyway no encuentra `V1__*.sql`, pruebas que antes pasaban), suele ser el IDE
+recompilando `target/` a la vez: corre `./mvnw -Pci clean verify`.
 
 ## Prohibido para inflar el número
 

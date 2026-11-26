@@ -348,8 +348,8 @@
 								</goals>
 							</execution>
 							<execution>
-								<!-- Piso de cobertura total (skill cobertura-minima): el build falla si baja.
-								     Meta 80 % en ambas; las ramas parten en 74 % y solo se suben, nunca se bajan. -->
+								<!-- Cobertura mínima total (skill cobertura-minima): 80 % de líneas y de ramas.
+								     El build falla si baja; este mínimo no se rebaja. -->
 								<id>cobertura-minima</id>
 								<phase>verify</phase>
 								<goals>
@@ -368,7 +368,7 @@
 												<limit>
 													<counter>BRANCH</counter>
 													<value>COVEREDRATIO</value>
-													<minimum>0.74</minimum>
+													<minimum>0.80</minimum>
 												</limit>
 											</limits>
 										</rule>
