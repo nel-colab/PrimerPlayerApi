@@ -4,6 +4,7 @@ import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 import cl.primerplayer.auditoria.infrastructure.AuditoriaRepositorio;
+import cl.primerplayer.catalogo.events.MaestroCatalogoCambiado;
 import cl.primerplayer.identidad.events.UsuarioAdministrado;
 import lombok.RequiredArgsConstructor;
 
@@ -17,6 +18,12 @@ class AuditoriaEscucha {
     @ApplicationModuleListener
     void usuarioAdministrado(UsuarioAdministrado e) {
         auditoria.registrar(e.ocurridoEn(), e.actorId(), e.accion(), "usuario", String.valueOf(e.usuarioId()),
+                e.antes(), e.despues());
+    }
+
+    @ApplicationModuleListener
+    void maestroCatalogoCambiado(MaestroCatalogoCambiado e) {
+        auditoria.registrar(e.ocurridoEn(), e.actorId(), e.accion(), e.entidad(), String.valueOf(e.entidadId()),
                 e.antes(), e.despues());
     }
 }

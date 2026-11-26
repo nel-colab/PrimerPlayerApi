@@ -124,6 +124,10 @@ calculadas sobre el resultado filtrado sin la propia faceta.
 | POST | `/admin/inventario/{productoId}/ajustes` | VENDEDOR | `{delta, motivo}` → `{stock}` |
 | GET | `/admin/inventario/{productoId}/movimientos` | VENDEDOR | kardex paginado |
 | GET/PUT | `/admin/inventario/configuracion` | ADMIN | `{umbralStockBajo}` |
+| GET/POST | `/admin/categorias` | ADMIN | lista `{id, slug, titulo, orden, productos, enUso}` (sin `todos`); crear `{titulo, slug?, orden?}` (slug se genera del título e inmutable) → 201; 409 `category-exists` |
+| PUT/DELETE | `/admin/categorias/{id}` | ADMIN | `{titulo, orden?}`; DELETE 204 o 409 `category-in-use` si alguna vez se usó en un producto (también eliminado) o en una revisión |
+| GET/POST | `/admin/franquicias` | ADMIN | lista `{id, nombre, productos, enUso}`; crear `{nombre}` → 201; 409 `franchise-exists` (sin distinguir mayúsculas) |
+| PUT/DELETE | `/admin/franquicias/{id}` | ADMIN | renombrar `{nombre}` (actualiza revisiones pendientes); DELETE 204 o 409 `franchise-in-use` |
 | POST | `/admin/media/imagenes` | VENDEDOR | multipart ≤ 5 MB → `{id, url}` |
 | POST | `/admin/media/comprobantes` | VENDEDOR | multipart → `{id}` (bucket privado) |
 | GET | `/admin/media/comprobantes/{id}` | VENDEDOR | `{url, expiraEn}` firmada 5 min |

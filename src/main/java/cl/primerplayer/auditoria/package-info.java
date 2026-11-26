@@ -4,6 +4,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Auditoría",
-    allowedDependencies = { "shared", "identidad :: api", "identidad :: events" }
+    allowedDependencies = { "shared", "identidad :: api", "identidad :: events", "catalogo :: events" }
 )
 package cl.primerplayer.auditoria;
